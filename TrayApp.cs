@@ -18,18 +18,29 @@ internal sealed class TrayApp : IDisposable
     {
         _config = AppConfig.Load();
 
-        var startupEnabled = StartupManager.IsEnabled();
-        if (_config.StartWithWindows != startupEnabled)
+        var startupEnabled = false;
+        var startupStateAvailable = true;
+
+        try
         {
-            _config.StartWithWindows = startupEnabled;
-            _config.Save();
+            startupEnabled = StartupManager.IsEnabled();
+            if (_config.StartWithWindows != startupEnabled)
+            {
+                _config.StartWithWindows = startupEnabled;
+                _config.Save();
+            }
+        }
+        catch
+        {
+            startupStateAvailable = false;
         }
 
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _toggleItem = new ToolStripMenuItem("Toggle Refresh Rate");
         _startWithWindowsItem = new ToolStripMenuItem("Start with Windows")
         {
-            Checked = startupEnabled
+            Checked = startupEnabled,
+            Enabled = startupStateAvailable
         };
         _exitItem = new ToolStripMenuItem("Exit");
 
@@ -158,6 +169,7 @@ internal sealed class TrayApp : IDisposable
         }
         catch (Exception ex)
         {
+            string rollbackError = string.Empty;
             try
             {
                 if (previousState)
@@ -169,13 +181,19 @@ internal sealed class TrayApp : IDisposable
                     StartupManager.Disable();
                 }
             }
-            catch
+            catch (Exception rollbackEx)
             {
+                rollbackError = rollbackEx.Message;
             }
 
-            _startWithWindowsItem.Checked = previousState;
-            _config.StartWithWindows = previousState;
-            ShowError($"Could not update startup setting: {ex.Message}");
+            var actualState = StartupManager.IsEnabled();
+            _startWithWindowsItem.Checked = actualState;
+            _config.StartWithWindows = actualState;
+
+            var message = string.IsNullOrEmpty(rollbackError)
+                ? $"Could not update startup setting: {ex.Message}"
+                : $"Could not update startup setting: {ex.Message} (rollback also failed: {rollbackError})";
+            ShowError(message);
         }
     }
 
