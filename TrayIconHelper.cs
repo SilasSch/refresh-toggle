@@ -59,9 +59,10 @@ internal static class TrayIconHelper
         using var path = RoundedRect(new Rectangle(0, 0, size, size), radius: 3);
         g.FillPath(bgBrush, path);
 
-        // White label – shrink font for 3-digit numbers
+        // White label – shrink font for 3-digit numbers; use a generic family so
+        // the code doesn't crash if "Arial" is not installed on the system.
         float fontSize = label.Length >= 3 ? 5.5f : 7f;
-        using var font = new Font("Arial", fontSize, FontStyle.Bold, GraphicsUnit.Point);
+        using var font = new Font(FontFamily.GenericSansSerif, fontSize, FontStyle.Bold, GraphicsUnit.Point);
         using var textBrush = new SolidBrush(Color.White);
 
         var textSize = g.MeasureString(label, font);

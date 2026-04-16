@@ -12,6 +12,7 @@ internal sealed class TrayApp : IDisposable
     private readonly ToolStripMenuItem _toggleItem;
     private readonly ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
+    private Icon? _currentIcon;
 
     public TrayApp()
     {
@@ -30,9 +31,10 @@ internal sealed class TrayApp : IDisposable
         _menu.Items.Add(_toggleItem);
         _menu.Items.Add(_exitItem);
 
+        _currentIcon = TrayIconHelper.CreateUnknown();
         _notifyIcon = new NotifyIcon
         {
-            Icon = TrayIconHelper.CreateUnknown(),
+            Icon = _currentIcon,
             Visible = true,
             ContextMenuStrip = _menu
         };
@@ -46,9 +48,9 @@ internal sealed class TrayApp : IDisposable
     public void Dispose()
     {
         _notifyIcon.Visible = false;
-        var icon = _notifyIcon.Icon;
         _notifyIcon.Dispose();
-        icon?.Dispose();
+        _currentIcon?.Dispose();
+        _currentIcon = null;
         _menu.Dispose();
     }
 
@@ -113,13 +115,9 @@ internal sealed class TrayApp : IDisposable
 
     private void UpdateIcon(Icon newIcon)
     {
-        var old = _notifyIcon.Icon;
         _notifyIcon.Icon = newIcon;
-        // Don't dispose system icons – only dispose icons we created ourselves.
-        if (old is not null && !ReferenceEquals(old, SystemIcons.Application))
-        {
-            old.Dispose();
-        }
+        _currentIcon?.Dispose();
+        _currentIcon = newIcon;
     }
 
     private void ShowError(string message)
