@@ -7,10 +7,10 @@ namespace RefreshToggle;
 
 internal static class TrayIconHelper
 {
-    // Blue for the lower rate (e.g. 60 Hz)
+    // Blue for RateA (e.g. 60 Hz by default)
     private static readonly Color ColorRateA = Color.FromArgb(0x33, 0x88, 0xFF);
 
-    // Green for the higher rate (e.g. 120 Hz)
+    // Green for RateB (e.g. 120 Hz by default)
     private static readonly Color ColorRateB = Color.FromArgb(0x22, 0xCC, 0x55);
 
     // Grey when the current rate is unknown or matches neither configured rate
@@ -19,7 +19,8 @@ internal static class TrayIconHelper
     /// <summary>
     /// Creates a 16×16 tray icon that shows <paramref name="refreshRate"/> on a
     /// coloured background: blue when it matches <see cref="AppConfig.RateA"/>,
-    /// green when it matches <see cref="AppConfig.RateB"/>, grey otherwise.
+    /// green when it matches <see cref="AppConfig.RateB"/>, grey when it matches
+    /// neither (rate is unknown or outside configured values).
     /// The caller is responsible for disposing the returned <see cref="Icon"/>.
     /// </summary>
     public static Icon CreateForRate(int refreshRate, AppConfig config)
@@ -78,7 +79,8 @@ internal static class TrayIconHelper
         }
         finally
         {
-            DestroyIcon(hicon);
+            bool destroyed = DestroyIcon(hicon);
+            System.Diagnostics.Debug.Assert(destroyed, $"DestroyIcon failed with error {Marshal.GetLastWin32Error()}");
         }
     }
 
@@ -94,6 +96,6 @@ internal static class TrayIconHelper
         return path;
     }
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
 }
