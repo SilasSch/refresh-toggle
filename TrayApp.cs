@@ -18,11 +18,18 @@ internal sealed class TrayApp : IDisposable
     {
         _config = AppConfig.Load();
 
+        var startupEnabled = StartupManager.IsEnabled();
+        if (_config.StartWithWindows != startupEnabled)
+        {
+            _config.StartWithWindows = startupEnabled;
+            _config.Save();
+        }
+
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _toggleItem = new ToolStripMenuItem("Toggle Refresh Rate");
         _startWithWindowsItem = new ToolStripMenuItem("Start with Windows")
         {
-            Checked = StartupManager.IsEnabled()
+            Checked = startupEnabled
         };
         _exitItem = new ToolStripMenuItem("Exit");
 
@@ -131,24 +138,43 @@ internal sealed class TrayApp : IDisposable
 
     private void ToggleStartWithWindows()
     {
+        var previousState = _startWithWindowsItem.Checked;
+        var newState = !previousState;
+
         try
         {
-            if (_startWithWindowsItem.Checked)
+            if (newState)
             {
-                StartupManager.Disable();
-                _startWithWindowsItem.Checked = false;
-                _config.StartWithWindows = false;
+                StartupManager.Enable();
             }
             else
             {
-                StartupManager.Enable();
-                _startWithWindowsItem.Checked = true;
-                _config.StartWithWindows = true;
+                StartupManager.Disable();
             }
+
+            _startWithWindowsItem.Checked = newState;
+            _config.StartWithWindows = newState;
             _config.Save();
         }
         catch (Exception ex)
         {
+            try
+            {
+                if (previousState)
+                {
+                    StartupManager.Enable();
+                }
+                else
+                {
+                    StartupManager.Disable();
+                }
+            }
+            catch
+            {
+            }
+
+            _startWithWindowsItem.Checked = previousState;
+            _config.StartWithWindows = previousState;
             ShowError($"Could not update startup setting: {ex.Message}");
         }
     }
