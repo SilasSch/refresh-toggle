@@ -58,7 +58,7 @@ internal sealed class TrayApp : IDisposable
     {
         using var stream = Assembly.GetExecutingAssembly()
             .GetManifestResourceStream("RefreshToggle.icon.ico");
-        return stream is not null ? new Icon(stream) : SystemIcons.Application;
+        return stream is not null ? new Icon(stream) : (Icon)SystemIcons.Application.Clone();
     }
 
     private void NotifyIconOnMouseClick(object? sender, MouseEventArgs e)

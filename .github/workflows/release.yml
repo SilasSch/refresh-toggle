@@ -33,7 +33,26 @@ jobs:
       - name: Stage artifact
         run: copy publish\${{ matrix.rid }}\RefreshToggle.exe ${{ matrix.artifact }}
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.artifact }}
+          files: |
+            artifacts/RefreshToggle-x64.exe
+            artifacts/RefreshToggle-arm64.exe
