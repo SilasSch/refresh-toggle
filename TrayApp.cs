@@ -10,6 +10,7 @@ internal sealed class TrayApp : IDisposable
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _toggleItem;
+    private readonly ToolStripMenuItem _startWithWindowsItem;
     private readonly ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
 
@@ -19,15 +20,21 @@ internal sealed class TrayApp : IDisposable
 
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _toggleItem = new ToolStripMenuItem("Toggle Refresh Rate");
+        _startWithWindowsItem = new ToolStripMenuItem("Start with Windows")
+        {
+            Checked = StartupManager.IsEnabled()
+        };
         _exitItem = new ToolStripMenuItem("Exit");
 
         _toggleItem.Click += (_, _) => ToggleRefreshRate();
+        _startWithWindowsItem.Click += (_, _) => ToggleStartWithWindows();
         _exitItem.Click += (_, _) => ExitApplication();
 
         _menu = new ContextMenuStrip();
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(_toggleItem);
+        _menu.Items.Add(_startWithWindowsItem);
         _menu.Items.Add(_exitItem);
 
         _notifyIcon = new NotifyIcon
@@ -120,6 +127,30 @@ internal sealed class TrayApp : IDisposable
     {
         const int maxLength = 63;
         return text.Length <= maxLength ? text : text[..maxLength];
+    }
+
+    private void ToggleStartWithWindows()
+    {
+        try
+        {
+            if (_startWithWindowsItem.Checked)
+            {
+                StartupManager.Disable();
+                _startWithWindowsItem.Checked = false;
+                _config.StartWithWindows = false;
+            }
+            else
+            {
+                StartupManager.Enable();
+                _startWithWindowsItem.Checked = true;
+                _config.StartWithWindows = true;
+            }
+            _config.Save();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Could not update startup setting: {ex.Message}");
+        }
     }
 
     private static void ExitApplication()
