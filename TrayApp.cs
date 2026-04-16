@@ -32,7 +32,7 @@ internal sealed class TrayApp : IDisposable
 
         _notifyIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = TrayIconHelper.CreateUnknown(),
             Visible = true,
             ContextMenuStrip = _menu
         };
@@ -46,7 +46,9 @@ internal sealed class TrayApp : IDisposable
     public void Dispose()
     {
         _notifyIcon.Visible = false;
+        var icon = _notifyIcon.Icon;
         _notifyIcon.Dispose();
+        icon?.Dispose();
         _menu.Dispose();
     }
 
@@ -99,11 +101,24 @@ internal sealed class TrayApp : IDisposable
         {
             _statusItem.Text = $"Current: {current} Hz";
             _notifyIcon.Text = TrimTooltip($"RefreshToggle: {current} Hz ({_config.RateA}/{_config.RateB})");
+            UpdateIcon(TrayIconHelper.CreateForRate(current, _config));
         }
         else
         {
             _statusItem.Text = "Current: Unknown";
             _notifyIcon.Text = TrimTooltip("RefreshToggle");
+            UpdateIcon(TrayIconHelper.CreateUnknown());
+        }
+    }
+
+    private void UpdateIcon(Icon newIcon)
+    {
+        var old = _notifyIcon.Icon;
+        _notifyIcon.Icon = newIcon;
+        // Don't dispose system icons – only dispose icons we created ourselves.
+        if (old is not null && !ReferenceEquals(old, SystemIcons.Application))
+        {
+            old.Dispose();
         }
     }
 
