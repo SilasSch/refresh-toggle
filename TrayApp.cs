@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Reflection;
 using System.Windows.Forms;
 
 namespace RefreshToggle;
@@ -13,12 +12,11 @@ internal sealed class TrayApp : IDisposable
     private readonly ToolStripMenuItem _toggleItem;
     private readonly ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
-    private readonly Icon _appIcon;
+    private Icon? _currentIcon;
 
     public TrayApp()
     {
         _config = AppConfig.Load();
-        _appIcon = LoadAppIcon();
 
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _toggleItem = new ToolStripMenuItem("Toggle Refresh Rate");
@@ -33,9 +31,10 @@ internal sealed class TrayApp : IDisposable
         _menu.Items.Add(_toggleItem);
         _menu.Items.Add(_exitItem);
 
+        _currentIcon = TrayIconHelper.CreateUnknown();
         _notifyIcon = new NotifyIcon
         {
-            Icon = _appIcon,
+            Icon = _currentIcon,
             Visible = true,
             ContextMenuStrip = _menu
         };
@@ -50,26 +49,9 @@ internal sealed class TrayApp : IDisposable
     {
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _currentIcon?.Dispose();
+        _currentIcon = null;
         _menu.Dispose();
-        _appIcon.Dispose();
-    }
-
-    private static Icon LoadAppIcon()
-    {
-        using var stream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream("RefreshToggle.icon.ico");
-
-        if (stream is null)
-        {
-            return (Icon)SystemIcons.Application.Clone();
-        }
-
-        using var iconStream = new System.IO.MemoryStream();
-        stream.CopyTo(iconStream);
-        iconStream.Position = 0;
-
-        using var icon = new Icon(iconStream);
-        return (Icon)icon.Clone();
     }
 
     private void NotifyIconOnMouseClick(object? sender, MouseEventArgs e)
@@ -121,12 +103,21 @@ internal sealed class TrayApp : IDisposable
         {
             _statusItem.Text = $"Current: {current} Hz";
             _notifyIcon.Text = TrimTooltip($"RefreshToggle: {current} Hz ({_config.RateA}/{_config.RateB})");
+            UpdateIcon(TrayIconHelper.CreateForRate(current, _config));
         }
         else
         {
             _statusItem.Text = "Current: Unknown";
             _notifyIcon.Text = TrimTooltip("RefreshToggle");
+            UpdateIcon(TrayIconHelper.CreateUnknown());
         }
+    }
+
+    private void UpdateIcon(Icon newIcon)
+    {
+        _notifyIcon.Icon = newIcon;
+        _currentIcon?.Dispose();
+        _currentIcon = newIcon;
     }
 
     private void ShowError(string message)
