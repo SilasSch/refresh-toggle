@@ -17,10 +17,11 @@ internal static class TrayIconHelper
     private static readonly Color ColorUnknown = Color.FromArgb(0x88, 0x88, 0x88);
 
     /// <summary>
-    /// Creates a 16×16 tray icon that shows <paramref name="refreshRate"/> on a
-    /// coloured background: blue when it matches <see cref="AppConfig.RateA"/>,
-    /// green when it matches <see cref="AppConfig.RateB"/>, grey when it matches
-    /// neither (rate is unknown or outside configured values).
+    /// Creates a tray icon sized to <see cref="SystemInformation.SmallIconSize"/> that
+    /// shows <paramref name="refreshRate"/> on a coloured background: blue when it
+    /// matches <see cref="AppConfig.RateA"/>, green when it matches
+    /// <see cref="AppConfig.RateB"/>, grey when it matches neither (rate is unknown or
+    /// outside configured values).
     /// The caller is responsible for disposing the returned <see cref="Icon"/>.
     /// </summary>
     public static Icon CreateForRate(int refreshRate, AppConfig config)
@@ -48,8 +49,9 @@ internal static class TrayIconHelper
     }
 
     /// <summary>
-    /// Creates a 16×16 grey tray icon with a "?" label, used when the refresh
-    /// rate cannot be determined.
+    /// Creates a grey tray icon with a "?" label, sized to
+    /// <see cref="SystemInformation.SmallIconSize"/>, used when the refresh rate cannot
+    /// be determined.
     /// The caller is responsible for disposing the returned <see cref="Icon"/>.
     /// </summary>
     public static Icon CreateUnknown() => BuildIcon("?", ColorUnknown);
@@ -58,7 +60,7 @@ internal static class TrayIconHelper
 
     private static Icon BuildIcon(string label, Color background)
     {
-        const int size = 16;
+        int size = SystemInformation.SmallIconSize.Width;
 
         using var bmp = new Bitmap(size, size);
         using var g = Graphics.FromImage(bmp);
@@ -66,14 +68,14 @@ internal static class TrayIconHelper
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.SingleBitPerPixelGridFit;
 
-        // Rounded-rectangle background
+        // Rounded-rectangle background – corner radius scales with icon size
+        int radius = Math.Max(2, size * 3 / 16);
         using var bgBrush = new SolidBrush(background);
-        using var path = RoundedRect(new Rectangle(0, 0, size, size), radius: 3);
+        using var path = RoundedRect(new Rectangle(0, 0, size, size), radius);
         g.FillPath(bgBrush, path);
 
-        // White label – shrink font for 3-digit numbers; use a generic family so
-        // the code doesn't crash if "Arial" is not installed on the system.
-        float fontSize = label.Length >= 3 ? 5.5f : 7f;
+        // White label – font size scales with icon size; shrink further for 3-digit numbers
+        float fontSize = label.Length >= 3 ? size * 5.5f / 16f : size * 7f / 16f;
         using var font = new Font(FontFamily.GenericSansSerif, fontSize, FontStyle.Bold, GraphicsUnit.Point);
         using var textBrush = new SolidBrush(Color.White);
 
