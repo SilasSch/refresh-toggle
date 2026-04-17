@@ -76,7 +76,7 @@ internal static class TrayIconHelper
 
         // White label – font size scales with icon size; shrink further for 3-digit numbers
         float fontSize = label.Length >= 3 ? size * 5.5f / 16f : size * 7f / 16f;
-        using var font = new Font(FontFamily.GenericSansSerif, fontSize, FontStyle.Bold, GraphicsUnit.Point);
+        using var font = new Font(FontFamily.GenericSansSerif, fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
         using var textBrush = new SolidBrush(Color.White);
 
         using var stringFormat = new StringFormat
@@ -92,7 +92,8 @@ internal static class TrayIconHelper
         var hicon = bmp.GetHicon();
         try
         {
-            return (Icon)Icon.FromHandle(hicon).Clone();
+            using var icon = Icon.FromHandle(hicon);
+            return (Icon)icon.Clone();
         }
         finally
         {
