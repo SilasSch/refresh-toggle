@@ -46,6 +46,22 @@ internal sealed class TrayApp : IDisposable
             }
         }
 
+        // Remove stale Run entry if it exists but doesn't match the current executable path.
+        if (startupStateAvailable && !startupEnabled)
+        {
+            try
+            {
+                if (StartupManager.HasEntry())
+                {
+                    StartupManager.Disable();
+                }
+            }
+            catch
+            {
+                // Best effort: don't crash startup if the stale entry can't be removed.
+            }
+        }
+
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _toggleItem = new ToolStripMenuItem("Toggle Refresh Rate");
         _startWithWindowsItem = new ToolStripMenuItem("Start with Windows")

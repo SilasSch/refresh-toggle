@@ -31,4 +31,14 @@ internal static class StartupManager
         return exePath is not null
             && string.Equals(normalizedStoredValue, exePath, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Returns true if a Run entry exists for this app regardless of whether it matches the current executable path.
+    /// Use this to detect stale entries left behind when the binary was moved or renamed.
+    /// </summary>
+    public static bool HasEntry()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath);
+        return key?.GetValue(AppName) is not null;
+    }
 }

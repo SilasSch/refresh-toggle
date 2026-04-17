@@ -41,4 +41,4 @@ On first run, `%APPDATA%\RefreshToggle\config.json` is created:
 }
 ```
 
-Edit the file to change your preferred refresh rates. The `StartWithWindows` field is managed automatically by the context menu item **Start with Windows** and reflects whether the app is registered to launch on login.
+Edit the file to change your preferred refresh rates. The `StartWithWindows` field is managed automatically by the context menu item **Start with Windows** and reflects whether the app is registered to launch on login using the current executable path.
