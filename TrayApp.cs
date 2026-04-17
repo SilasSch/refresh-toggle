@@ -24,15 +24,28 @@ internal sealed class TrayApp : IDisposable
         try
         {
             startupEnabled = StartupManager.IsEnabled();
-            if (_config.StartWithWindows != startupEnabled)
-            {
-                _config.StartWithWindows = startupEnabled;
-                _config.Save();
-            }
         }
         catch
         {
             startupStateAvailable = false;
+        }
+
+        if (startupStateAvailable && _config.StartWithWindows != startupEnabled)
+        {
+            _config.StartWithWindows = startupEnabled;
+
+            try
+            {
+                _config.Save();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to save startup setting to the application configuration.{Environment.NewLine}{Environment.NewLine}{ex.Message}",
+                    "RefreshToggle",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
         }
 
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
@@ -186,9 +199,25 @@ internal sealed class TrayApp : IDisposable
                 rollbackError = rollbackEx.Message;
             }
 
-            var actualState = StartupManager.IsEnabled();
-            _startWithWindowsItem.Checked = actualState;
-            _config.StartWithWindows = actualState;
+            try
+            {
+                var actualState = StartupManager.IsEnabled();
+                _startWithWindowsItem.Checked = actualState;
+                _config.StartWithWindows = actualState;
+
+                try
+                {
+                    _config.Save();
+                }
+                catch
+                {
+                    // Best effort only: avoid throwing while already handling an error.
+                }
+            }
+            catch
+            {
+                // Leave the current UI/config state unchanged if the actual state can't be determined.
+            }
 
             var message = string.IsNullOrEmpty(rollbackError)
                 ? $"Could not update startup setting: {ex.Message}"
