@@ -66,10 +66,14 @@ internal static class TrayIconHelper
         using var font = new Font(FontFamily.GenericSansSerif, fontSize, FontStyle.Bold, GraphicsUnit.Point);
         using var textBrush = new SolidBrush(Color.White);
 
-        var textSize = g.MeasureString(label, font);
-        float x = (size - textSize.Width) / 2f;
-        float y = (size - textSize.Height) / 2f;
-        g.DrawString(label, font, textBrush, x, y);
+        using var stringFormat = new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
+
+        var textBounds = new RectangleF(0, 0, size, size);
+        g.DrawString(label, font, textBrush, textBounds, stringFormat);
 
         // Convert Bitmap → Icon (clone so we can safely destroy the GDI handle)
         var hicon = bmp.GetHicon();
@@ -80,7 +84,10 @@ internal static class TrayIconHelper
         finally
         {
             bool destroyed = DestroyIcon(hicon);
-            System.Diagnostics.Debug.Assert(destroyed, $"DestroyIcon failed with error {Marshal.GetLastWin32Error()}");
+            if (!destroyed)
+            {
+                System.Diagnostics.Debug.Fail($"DestroyIcon failed with error {Marshal.GetLastWin32Error()}");
+            }
         }
     }
 
