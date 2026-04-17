@@ -20,14 +20,16 @@ internal sealed class TrayApp : IDisposable
 
         var startupEnabled = false;
         var startupStateAvailable = true;
+        string? deferredError = null;
 
         try
         {
             startupEnabled = StartupManager.IsEnabled();
         }
-        catch
+        catch (Exception ex)
         {
             startupStateAvailable = false;
+            deferredError = $"Could not determine startup state: {ex.Message}";
         }
 
         if (startupStateAvailable && _config.StartWithWindows != startupEnabled)
@@ -40,11 +42,7 @@ internal sealed class TrayApp : IDisposable
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to save startup setting to the application configuration.{Environment.NewLine}{Environment.NewLine}{ex.Message}",
-                    "RefreshToggle",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                deferredError = $"Failed to save startup setting to the application configuration.{Environment.NewLine}{Environment.NewLine}{ex.Message}";
             }
         }
 
@@ -79,6 +77,11 @@ internal sealed class TrayApp : IDisposable
         _notifyIcon.DoubleClick += (_, _) => ToggleRefreshRate();
 
         UpdateStatusText();
+
+        if (deferredError is not null)
+        {
+            ShowError(deferredError);
+        }
     }
 
     public void Dispose()
@@ -213,16 +216,27 @@ internal sealed class TrayApp : IDisposable
                 {
                     // Best effort only: avoid throwing while already handling an error.
                 }
+
+                if (actualState == newState)
+                {
+                    ShowError($"Could not save startup setting: {ex.Message}");
+                }
+                else
+                {
+                    var message = string.IsNullOrEmpty(rollbackError)
+                        ? $"Could not update startup setting: {ex.Message}"
+                        : $"Could not update startup setting: {ex.Message} (rollback also failed: {rollbackError})";
+                    ShowError(message);
+                }
             }
             catch
             {
                 // Leave the current UI/config state unchanged if the actual state can't be determined.
+                var message = string.IsNullOrEmpty(rollbackError)
+                    ? $"Could not update startup setting: {ex.Message}"
+                    : $"Could not update startup setting: {ex.Message} (rollback also failed: {rollbackError})";
+                ShowError(message);
             }
-
-            var message = string.IsNullOrEmpty(rollbackError)
-                ? $"Could not update startup setting: {ex.Message}"
-                : $"Could not update startup setting: {ex.Message} (rollback also failed: {rollbackError})";
-            ShowError(message);
         }
     }
 
