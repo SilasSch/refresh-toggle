@@ -25,13 +25,24 @@ internal static class TrayIconHelper
     /// </summary>
     public static Icon CreateForRate(int refreshRate, AppConfig config)
     {
+        if (refreshRate <= 1)
+        {
+            return CreateUnknown();
+        }
+
         Color bg;
         if (refreshRate == config.RateA)
+        {
             bg = ColorRateA;
+        }
         else if (refreshRate == config.RateB)
+        {
             bg = ColorRateB;
+        }
         else
+        {
             bg = ColorUnknown;
+        }
 
         return BuildIcon(refreshRate.ToString(), bg);
     }
