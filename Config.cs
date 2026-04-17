@@ -6,6 +6,7 @@ internal sealed class AppConfig
 {
     public int RateA { get; set; } = 60;
     public int RateB { get; set; } = 120;
+    public bool StartWithWindows { get; set; } = false;
 
     private static string ConfigDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RefreshToggle");

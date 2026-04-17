@@ -9,6 +9,7 @@ Lightweight Windows system tray utility that toggles the primary display refresh
 - **Configurable** — edit `%APPDATA%\RefreshToggle\config.json`
 - **Single instance** — only one instance allowed
 - **ARM64 compatible** — .NET 8, runs on Snapdragon laptops
+- **Start with Windows** — optional auto-start via context menu
 
 ## Build
 
@@ -48,8 +49,9 @@ On first run, `%APPDATA%\RefreshToggle\config.json` is created:
 ```json
 {
   "RateA": 60,
-  "RateB": 120
+  "RateB": 120,
+  "StartWithWindows": false
 }
 ```
 
-Edit the file to change your preferred refresh rates.
+Edit the file to change your preferred refresh rates. The `StartWithWindows` field is managed automatically by the context menu item **Start with Windows** and reflects whether the app is registered to launch on login using the current executable path.
