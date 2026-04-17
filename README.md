@@ -22,11 +22,24 @@ dotnet build
 dotnet run
 ```
 
+## Download
+
+Pre-built self-contained binaries (no .NET installation required) are available on the [Releases](../../releases) page:
+
+- `RefreshToggle-x64.exe` — for standard 64-bit PCs
+- `RefreshToggle-arm64.exe` — for Snapdragon / ARM64 laptops
+
 ## Publish (single .exe)
 
 ```bash
-dotnet publish -c Release -r win-arm64 --self-contained -o ./publish
+# x64
+dotnet publish -c Release -r win-x64 --self-contained -o ./publish/win-x64
+
+# ARM64
+dotnet publish -c Release -r win-arm64 --self-contained -o ./publish/win-arm64
 ```
+
+Releases are also built automatically via GitHub Actions when a `v*` tag is pushed.
 
 ## Config
 

@@ -1,0 +1,66 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - rid: win-arm64
+            artifact: RefreshToggle-arm64
+            exe: RefreshToggle-arm64.exe
+          - rid: win-x64
+            artifact: RefreshToggle-x64
+            exe: RefreshToggle-x64.exe
+
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Publish
+        run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o ./publish
+
+      - name: Rename exe
+        run: Rename-Item ./publish/RefreshToggle.exe ${{ matrix.exe }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ./publish/${{ matrix.exe }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download ARM64
+        uses: actions/download-artifact@v4
+        with:
+          name: RefreshToggle-arm64
+          path: ./artifacts
+
+      - name: Download x64
+        uses: actions/download-artifact@v4
+        with:
+          name: RefreshToggle-x64
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ./artifacts/*.exe

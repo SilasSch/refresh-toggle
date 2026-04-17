@@ -9,6 +9,13 @@
     <AssemblyName>RefreshToggle</AssemblyName>
     <RootNamespace>RefreshToggle</RootNamespace>
     <PlatformTarget>AnyCPU</PlatformTarget>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="icon.ico" LogicalName="RefreshToggle.icon.ico" />
+  </ItemGroup>
 
 </Project>
