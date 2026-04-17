@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 
 namespace RefreshToggle;
@@ -12,10 +13,12 @@ internal sealed class TrayApp : IDisposable
     private readonly ToolStripMenuItem _toggleItem;
     private readonly ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
+    private readonly Icon _appIcon;
 
     public TrayApp()
     {
         _config = AppConfig.Load();
+        _appIcon = LoadAppIcon();
 
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _toggleItem = new ToolStripMenuItem("Toggle Refresh Rate");
@@ -32,7 +35,7 @@ internal sealed class TrayApp : IDisposable
 
         _notifyIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = _appIcon,
             Visible = true,
             ContextMenuStrip = _menu
         };
@@ -48,6 +51,25 @@ internal sealed class TrayApp : IDisposable
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _menu.Dispose();
+        _appIcon.Dispose();
+    }
+
+    private static Icon LoadAppIcon()
+    {
+        using var stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("RefreshToggle.icon.ico");
+
+        if (stream is null)
+        {
+            return (Icon)SystemIcons.Application.Clone();
+        }
+
+        using var iconStream = new System.IO.MemoryStream();
+        stream.CopyTo(iconStream);
+        iconStream.Position = 0;
+
+        using var icon = new Icon(iconStream);
+        return (Icon)icon.Clone();
     }
 
     private void NotifyIconOnMouseClick(object? sender, MouseEventArgs e)
