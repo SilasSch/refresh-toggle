@@ -165,8 +165,22 @@ internal sealed class TrayApp : IDisposable
 
     private void ToggleStartWithWindows()
     {
-        var previousState = _startWithWindowsItem.Checked;
+        bool previousState;
+        try
+        {
+            previousState = StartupManager.IsEnabled();
+        }
+        catch (Exception ex)
+        {
+            _startWithWindowsItem.Enabled = false;
+            ShowError($"Could not read startup state: {ex.Message}");
+            return;
+        }
+
         var newState = !previousState;
+
+        // Sync UI to the actual registry state in case they diverged.
+        _startWithWindowsItem.Checked = previousState;
 
         try
         {
