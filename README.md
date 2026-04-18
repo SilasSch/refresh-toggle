@@ -1,11 +1,12 @@
 # RefreshToggle
 
-Lightweight Windows system tray utility that toggles the primary display refresh rate between two configured values.
+Lightweight Windows system tray utility that toggles display refresh rates between two configured values.
 
 ## Features
 
 - **One-click toggle** — left-click the tray icon to switch refresh rates
 - **System tray** — tooltip shows current Hz, right-click for context menu
+- **Multi-monitor support** — context menu shows per-display toggle entries
 - **Configurable** — edit `%APPDATA%\RefreshToggle\config.json`
 - **Single instance** — only one instance allowed
 - **ARM64 compatible** — .NET 8, runs on Snapdragon laptops

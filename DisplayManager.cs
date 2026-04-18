@@ -1,7 +1,10 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace RefreshToggle;
+
+internal sealed record DisplayInfo(string DeviceName, string Label, bool IsPrimary);
 
 internal sealed class DisplayManager
 {
@@ -9,10 +12,33 @@ internal sealed class DisplayManager
     private const int DISP_CHANGE_SUCCESSFUL = 0;
     private const int DM_DISPLAYFREQUENCY = 0x00400000;
 
-    public bool TryGetCurrentRefreshRate(out int refreshRate, out string? error)
+    public IReadOnlyList<DisplayInfo> GetDisplays()
+    {
+        var screens = Screen.AllScreens;
+        var displays = new List<DisplayInfo>(screens.Length);
+
+        for (var i = 0; i < screens.Length; i++)
+        {
+            var screen = screens[i];
+            var label = $"Display {i + 1}";
+            if (screen.Primary)
+            {
+                label += " (Primary)";
+            }
+
+            displays.Add(new DisplayInfo(screen.DeviceName, label, screen.Primary));
+        }
+
+        return displays;
+    }
+
+    public bool TryGetCurrentRefreshRate(out int refreshRate, out string? error) =>
+        TryGetCurrentRefreshRate(null, out refreshRate, out error);
+
+    public bool TryGetCurrentRefreshRate(string? deviceName, out int refreshRate, out string? error)
     {
         var mode = CreateDevMode();
-        if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref mode))
+        if (!EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref mode))
         {
             refreshRate = 0;
             error = $"EnumDisplaySettings failed: {new Win32Exception(Marshal.GetLastWin32Error()).Message}";
@@ -24,7 +50,10 @@ internal sealed class DisplayManager
         return true;
     }
 
-    public bool TrySetRefreshRate(int refreshRate, out string? error)
+    public bool TrySetRefreshRate(int refreshRate, out string? error) =>
+        TrySetRefreshRate(null, refreshRate, out error);
+
+    public bool TrySetRefreshRate(string? deviceName, int refreshRate, out string? error)
     {
         if (refreshRate <= 0)
         {
@@ -33,7 +62,7 @@ internal sealed class DisplayManager
         }
 
         var mode = CreateDevMode();
-        if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref mode))
+        if (!EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref mode))
         {
             error = $"EnumDisplaySettings failed: {new Win32Exception(Marshal.GetLastWin32Error()).Message}";
             return false;
@@ -42,7 +71,7 @@ internal sealed class DisplayManager
         mode.dmDisplayFrequency = refreshRate;
         mode.dmFields |= DM_DISPLAYFREQUENCY;
 
-        var result = ChangeDisplaySettingsEx(null, ref mode, IntPtr.Zero, 0, IntPtr.Zero);
+        var result = ChangeDisplaySettingsEx(deviceName, ref mode, IntPtr.Zero, 0, IntPtr.Zero);
         if (result != DISP_CHANGE_SUCCESSFUL)
         {
             error = $"ChangeDisplaySettingsEx failed with code {result}.";
