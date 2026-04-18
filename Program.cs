@@ -14,10 +14,25 @@ internal static class Program
             return;
         }
 
+        InstallResult installResult;
+        try
+        {
+            installResult = InstallationManager.EnsureInstalled();
+
+            if (StartupManager.HasEntry())
+            {
+                StartupManager.Enable();
+            }
+        }
+        catch
+        {
+            installResult = new InstallResult(false);
+        }
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        using var trayApp = new TrayApp();
+        using var trayApp = new TrayApp(installResult.InstalledNow);
         Application.Run();
     }
 }
