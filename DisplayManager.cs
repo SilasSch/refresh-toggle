@@ -17,10 +17,11 @@ internal sealed class DisplayManager
         var screens = Screen.AllScreens;
         var displays = new List<DisplayInfo>(screens.Length);
 
-        for (var i = 0; i < screens.Length; i++)
+        for (var index = 0; index < screens.Length; index++)
         {
-            var screen = screens[i];
-            var label = $"Display {i + 1}";
+            var screen = screens[index];
+            var displayNumber = index + 1;
+            var label = $"Display {displayNumber}";
             if (screen.Primary)
             {
                 label += " (Primary)";
