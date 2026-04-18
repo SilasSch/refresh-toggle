@@ -16,7 +16,7 @@ internal sealed class TrayApp : IDisposable
     private readonly AppConfig _config;
     private Icon? _currentIcon;
 
-    public TrayApp(bool showInstallNotification)
+    public TrayApp(bool showInstallNotification, string? installError)
     {
         _config = AppConfig.Load();
 
@@ -111,6 +111,11 @@ internal sealed class TrayApp : IDisposable
         if (showInstallNotification)
         {
             ShowInfo(@"Installed to %LOCALAPPDATA%\RefreshToggle");
+        }
+
+        if (!string.IsNullOrWhiteSpace(installError))
+        {
+            ShowError(installError);
         }
     }
 
@@ -326,7 +331,6 @@ internal sealed class TrayApp : IDisposable
         try
         {
             var exitAfterUninstall = InstallationManager.RemoveInstalledCopy();
-            _uninstallItem.Enabled = InstallationManager.HasInstalledCopy();
 
             if (exitAfterUninstall)
             {
@@ -340,6 +344,10 @@ internal sealed class TrayApp : IDisposable
         catch (Exception ex)
         {
             ShowError($"Could not remove installed copy: {ex.Message}");
+        }
+        finally
+        {
+            _uninstallItem.Enabled = InstallationManager.HasInstalledCopy();
         }
     }
 }

@@ -15,6 +15,7 @@ internal static class Program
         }
 
         InstallResult installResult;
+        string? installError = null;
         try
         {
             installResult = InstallationManager.EnsureInstalled();
@@ -24,15 +25,16 @@ internal static class Program
                 StartupManager.Enable();
             }
         }
-        catch
+        catch (Exception ex)
         {
             installResult = new InstallResult(false);
+            installError = $"Could not install to {InstallationManager.InstallDirectory}: {ex.Message}";
         }
 
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        using var trayApp = new TrayApp(installResult.InstalledNow);
+        using var trayApp = new TrayApp(installResult.InstalledNow, installError);
         Application.Run();
     }
 }

@@ -49,15 +49,20 @@ internal static class InstallationManager
     private static void StartDeferredDeleteProcess()
     {
         var args =
-            $"/c timeout /t 2 /nobreak >nul & del /f /q \"{InstalledExecutablePath}\" & rmdir /q \"{InstallDirectory}\"";
+            $"/c timeout /t 2 /nobreak >nul & del /f /q {QuoteForCmd(InstalledExecutablePath)} & rmdir /s /q {QuoteForCmd(InstallDirectory)}";
 
-        Process.Start(new ProcessStartInfo
+        var cleanupProcess = Process.Start(new ProcessStartInfo
         {
             FileName = "cmd.exe",
             Arguments = args,
             CreateNoWindow = true,
             UseShellExecute = false
         });
+
+        if (cleanupProcess is null)
+        {
+            throw new InvalidOperationException("Could not start deferred uninstall process.");
+        }
     }
 
     private static void TryDeleteInstallDirectory()
@@ -74,6 +79,9 @@ internal static class InstallationManager
 
     private static bool PathsEqual(string left, string right) =>
         string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
+
+    private static string QuoteForCmd(string value) =>
+        $"\"{value.Replace("^", "^^", StringComparison.Ordinal).Replace("%", "%%", StringComparison.Ordinal).Replace("!", "^!", StringComparison.Ordinal).Replace("&", "^&", StringComparison.Ordinal).Replace("|", "^|", StringComparison.Ordinal).Replace("<", "^<", StringComparison.Ordinal).Replace(">", "^>", StringComparison.Ordinal).Replace("(", "^(", StringComparison.Ordinal).Replace(")", "^)", StringComparison.Ordinal).Replace("=", "^=", StringComparison.Ordinal).Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 }
 
 internal readonly record struct InstallResult(bool InstalledNow);
