@@ -14,8 +14,10 @@ internal sealed class DisplayManager
 
     public IReadOnlyList<DisplayInfo> GetDisplays()
     {
-        var screens = (Screen[])Screen.AllScreens.Clone();
-        Array.Sort(screens, CompareScreens);
+        var screens = Screen.AllScreens
+            .OrderByDescending(screen => screen.Primary)
+            .ThenBy(screen => screen.DeviceName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var displays = new List<DisplayInfo>(screens.Length);
 
         for (var index = 0; index < screens.Length; index++)
@@ -29,19 +31,9 @@ internal sealed class DisplayManager
         return displays;
     }
 
-    private static int CompareScreens(Screen left, Screen right)
-    {
-        if (left.Primary != right.Primary)
-        {
-            return left.Primary ? -1 : 1;
-        }
-
-        return string.Compare(left.DeviceName, right.DeviceName, StringComparison.OrdinalIgnoreCase);
-    }
-
     private static string CreateDisplayLabel(Screen screen)
     {
-        var label = screen.DeviceName;
+        var label = $"Display {screen.DeviceName.Replace(@"\\.\", string.Empty, StringComparison.OrdinalIgnoreCase)}";
         if (screen.Primary)
         {
             label += " (Primary)";

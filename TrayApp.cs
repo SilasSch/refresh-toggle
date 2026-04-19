@@ -19,6 +19,7 @@ internal sealed class TrayApp : IDisposable
     private IReadOnlyList<DisplayInfo> _displays = [];
     private ToolStripMenuItem? _noDisplaysItem;
     private Icon? _currentIcon;
+    private bool _disposed;
 
     public TrayApp()
     {
@@ -111,6 +112,12 @@ internal sealed class TrayApp : IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
@@ -278,7 +285,7 @@ internal sealed class TrayApp : IDisposable
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
-        if (_menu.IsDisposed)
+        if (_disposed)
         {
             return;
         }
