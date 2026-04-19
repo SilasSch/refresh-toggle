@@ -14,23 +14,40 @@ internal sealed class DisplayManager
 
     public IReadOnlyList<DisplayInfo> GetDisplays()
     {
-        var screens = Screen.AllScreens;
+        var screens = (Screen[])Screen.AllScreens.Clone();
+        Array.Sort(screens, CompareScreens);
         var displays = new List<DisplayInfo>(screens.Length);
 
         for (var index = 0; index < screens.Length; index++)
         {
             var screen = screens[index];
-            var displayNumber = index + 1;
-            var label = $"Display {displayNumber}";
-            if (screen.Primary)
-            {
-                label += " (Primary)";
-            }
+            var label = CreateDisplayLabel(screen);
 
             displays.Add(new DisplayInfo(screen.DeviceName, label, screen.Primary));
         }
 
         return displays;
+    }
+
+    private static int CompareScreens(Screen left, Screen right)
+    {
+        if (left.Primary != right.Primary)
+        {
+            return left.Primary ? -1 : 1;
+        }
+
+        return string.Compare(left.DeviceName, right.DeviceName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateDisplayLabel(Screen screen)
+    {
+        var label = screen.DeviceName;
+        if (screen.Primary)
+        {
+            label += " (Primary)";
+        }
+
+        return label;
     }
 
     public bool TryGetCurrentRefreshRate(out int refreshRate, out string? error) =>
