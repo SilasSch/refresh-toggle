@@ -6,8 +6,14 @@ namespace RefreshToggle;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        if (args.Length > 0 && string.Equals(args[0], "--cleanup", StringComparison.Ordinal))
+        {
+            InstallationManager.RunCleanupMode(args[1..]);
+            return;
+        }
+
         using var mutex = new Mutex(true, @"Global\RefreshToggle_SingleInstance", out var createdNew);
         if (!createdNew)
         {
@@ -19,11 +25,6 @@ internal static class Program
         try
         {
             installResult = InstallationManager.EnsureInstalled();
-
-            if (StartupManager.HasEntry())
-            {
-                StartupManager.Enable();
-            }
         }
         catch (Exception ex)
         {
@@ -31,10 +32,23 @@ internal static class Program
             installError = $"Could not install to {InstallationManager.InstallDirectory}: {ex.Message}";
         }
 
+        string? startupMigrationError = null;
+        if (StartupManager.HasEntry())
+        {
+            try
+            {
+                StartupManager.Enable();
+            }
+            catch (Exception ex)
+            {
+                startupMigrationError = $"Could not update startup entry: {ex.Message}";
+            }
+        }
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        using var trayApp = new TrayApp(installResult.InstalledNow, installError);
+        using var trayApp = new TrayApp(installResult.InstalledNow, installError, startupMigrationError);
         Application.Run();
     }
 }

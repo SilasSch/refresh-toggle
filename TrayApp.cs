@@ -16,7 +16,7 @@ internal sealed class TrayApp : IDisposable
     private readonly AppConfig _config;
     private Icon? _currentIcon;
 
-    public TrayApp(bool showInstallNotification, string? installError)
+    public TrayApp(bool showInstallNotification, string? installError, string? startupMigrationError)
     {
         _config = AppConfig.Load();
 
@@ -116,6 +116,11 @@ internal sealed class TrayApp : IDisposable
         if (!string.IsNullOrWhiteSpace(installError))
         {
             ShowError(installError);
+        }
+
+        if (!string.IsNullOrWhiteSpace(startupMigrationError))
+        {
+            ShowError(startupMigrationError);
         }
     }
 

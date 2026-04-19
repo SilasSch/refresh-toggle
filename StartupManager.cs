@@ -32,6 +32,8 @@ internal static class StartupManager
         if (key?.GetValue(AppName) is not string storedValue)
             return false;
         var exePath = InstallationManager.InstalledExecutablePath;
+        if (!File.Exists(exePath))
+            return false;
         var normalizedStoredValue = storedValue.Trim().Trim('"');
         return string.Equals(normalizedStoredValue, exePath, StringComparison.OrdinalIgnoreCase);
     }
