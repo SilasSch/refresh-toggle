@@ -19,7 +19,7 @@ internal sealed class TrayApp : IDisposable
     private IReadOnlyList<DisplayInfo> _displays = [];
     private ToolStripMenuItem? _noDisplaysItem;
     private Icon? _currentIcon;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public TrayApp()
     {

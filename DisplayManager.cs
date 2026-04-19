@@ -33,7 +33,10 @@ internal sealed class DisplayManager
 
     private static string CreateDisplayLabel(Screen screen)
     {
-        var label = $"Display {screen.DeviceName.Replace(@"\\.\", string.Empty, StringComparison.OrdinalIgnoreCase)}";
+        var friendlyName = screen.DeviceName.StartsWith(@"\\.\", StringComparison.OrdinalIgnoreCase)
+            ? screen.DeviceName[4..]
+            : screen.DeviceName;
+        var label = $"Display {friendlyName}";
         if (screen.Primary)
         {
             label += " (Primary)";
