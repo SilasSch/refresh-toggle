@@ -105,7 +105,7 @@ internal sealed class DisplayManager
             return false;
         }
 
-        var ratesSet = new HashSet<int>();
+        var distinctRates = new HashSet<int>();
         for (var modeIndex = 0; ; modeIndex++)
         {
             var mode = CreateDevMode();
@@ -131,10 +131,10 @@ internal sealed class DisplayManager
                 continue;
             }
 
-            ratesSet.Add(mode.dmDisplayFrequency);
+            distinctRates.Add(mode.dmDisplayFrequency);
         }
 
-        rates = ratesSet.OrderBy(rate => rate).ToArray();
+        rates = distinctRates.OrderBy(rate => rate).ToArray();
         error = string.Empty;
         return true;
     }
