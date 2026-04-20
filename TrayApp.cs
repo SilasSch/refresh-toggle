@@ -505,7 +505,7 @@ internal sealed class TrayApp : IDisposable
         {
             _config.RateA = previousRateA;
             _config.RateB = previousRateB;
-            ShowError($"Could not save refresh rate settings: {ex.Message}");
+            ShowError($"Could not save refresh rate settings. Changes were reverted: {ex.Message}");
         }
     }
 
