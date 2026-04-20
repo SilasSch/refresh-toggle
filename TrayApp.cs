@@ -469,7 +469,12 @@ internal sealed class TrayApp : IDisposable
             return;
         }
 
-        var supportedRates = _displayManager.GetSupportedRefreshRates(display.DeviceName);
+        if (!_displayManager.TryGetSupportedRefreshRates(display.DeviceName, out var supportedRates, out var getRatesError))
+        {
+            ShowError(getRatesError ?? $"Unable to enumerate supported refresh rates for {display.Label}.");
+            return;
+        }
+
         if (supportedRates.Count == 0)
         {
             ShowError($"No supported refresh rates found for {display.Label}.");

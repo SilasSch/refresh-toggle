@@ -95,15 +95,17 @@ internal sealed class DisplayManager
         return true;
     }
 
-    public IReadOnlyList<int> GetSupportedRefreshRates(string? deviceName = null)
+    public bool TryGetSupportedRefreshRates(string? deviceName, out IReadOnlyList<int> rates, out string? error)
     {
         var currentMode = CreateDevMode();
         if (!EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref currentMode))
         {
-            return [];
+            rates = [];
+            error = $"EnumDisplaySettings failed: {new Win32Exception(Marshal.GetLastWin32Error()).Message}";
+            return false;
         }
 
-        var rates = new HashSet<int>();
+        var supportedRates = new HashSet<int>();
         for (var modeIndex = 0; ; modeIndex++)
         {
             var mode = CreateDevMode();
@@ -129,10 +131,12 @@ internal sealed class DisplayManager
                 continue;
             }
 
-            rates.Add(mode.dmDisplayFrequency);
+            supportedRates.Add(mode.dmDisplayFrequency);
         }
 
-        return rates.OrderBy(rate => rate).ToArray();
+        rates = supportedRates.OrderBy(rate => rate).ToArray();
+        error = null;
+        return true;
     }
 
     private static DEVMODE CreateDevMode()
