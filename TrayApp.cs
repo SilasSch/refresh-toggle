@@ -1,4 +1,5 @@
 using System.Drawing;
+using Microsoft.Win32;
 using System.Windows.Forms;
 
 namespace RefreshToggle;
@@ -9,11 +10,16 @@ internal sealed class TrayApp : IDisposable
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
-    private readonly ToolStripMenuItem _toggleItem;
+    private readonly ToolStripSeparator _displaySectionStartSeparator;
+    private readonly ToolStripSeparator _displaySectionEndSeparator;
+    private readonly List<(DisplayInfo Display, ToolStripMenuItem Item)> _displayToggleItems = [];
     private readonly ToolStripMenuItem _startWithWindowsItem;
     private readonly ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
+    private IReadOnlyList<DisplayInfo> _displays = [];
+    private ToolStripMenuItem? _noDisplaysItem;
     private Icon? _currentIcon;
+    private volatile bool _disposed;
 
     public TrayApp()
     {
@@ -64,7 +70,8 @@ internal sealed class TrayApp : IDisposable
         }
 
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
-        _toggleItem = new ToolStripMenuItem("Toggle Refresh Rate");
+        _displaySectionStartSeparator = new ToolStripSeparator();
+        _displaySectionEndSeparator = new ToolStripSeparator();
         _startWithWindowsItem = new ToolStripMenuItem("Start with Windows")
         {
             Checked = startupEnabled,
@@ -72,16 +79,16 @@ internal sealed class TrayApp : IDisposable
         };
         _exitItem = new ToolStripMenuItem("Exit");
 
-        _toggleItem.Click += (_, _) => ToggleRefreshRate();
         _startWithWindowsItem.Click += (_, _) => ToggleStartWithWindows();
         _exitItem.Click += (_, _) => ExitApplication();
 
         _menu = new ContextMenuStrip();
         _menu.Items.Add(_statusItem);
-        _menu.Items.Add(new ToolStripSeparator());
-        _menu.Items.Add(_toggleItem);
+        _menu.Items.Add(_displaySectionStartSeparator);
+        _menu.Items.Add(_displaySectionEndSeparator);
         _menu.Items.Add(_startWithWindowsItem);
         _menu.Items.Add(_exitItem);
+        _menu.Opening += (_, _) => RefreshDisplayState();
 
         _currentIcon = TrayIconHelper.CreateUnknown();
         _notifyIcon = new NotifyIcon
@@ -93,8 +100,9 @@ internal sealed class TrayApp : IDisposable
 
         _notifyIcon.MouseClick += NotifyIconOnMouseClick;
         _notifyIcon.DoubleClick += (_, _) => ToggleRefreshRate();
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
-        UpdateStatusText();
+        RefreshDisplayState();
 
         if (deferredError is not null)
         {
@@ -104,6 +112,13 @@ internal sealed class TrayApp : IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _currentIcon?.Dispose();
@@ -121,16 +136,28 @@ internal sealed class TrayApp : IDisposable
 
     private void ToggleRefreshRate()
     {
-        if (!_displayManager.TryGetCurrentRefreshRate(out var current, out var getError))
+        var display = GetPrimaryOrFirstDisplay();
+        if (display is null)
         {
-            ShowError(getError ?? "Unable to read refresh rate.");
+            ShowError("No displays detected.");
+            return;
+        }
+
+        ToggleRefreshRate(display);
+    }
+
+    private void ToggleRefreshRate(DisplayInfo display)
+    {
+        if (!_displayManager.TryGetCurrentRefreshRate(display.DeviceName, out var current, out var getError))
+        {
+            ShowError(getError ?? $"Unable to read refresh rate for {display.Label}.");
             return;
         }
 
         var target = DetermineTargetRate(current);
-        if (!_displayManager.TrySetRefreshRate(target, out var setError))
+        if (!_displayManager.TrySetRefreshRate(display.DeviceName, target, out var setError))
         {
-            ShowError(setError ?? "Unable to set refresh rate.");
+            ShowError(setError ?? $"Unable to set refresh rate for {display.Label}.");
             return;
         }
 
@@ -156,9 +183,11 @@ internal sealed class TrayApp : IDisposable
 
     private void UpdateStatusText()
     {
-        if (_displayManager.TryGetCurrentRefreshRate(out var current, out _))
+        var primaryDisplay = GetPrimaryOrFirstDisplay();
+        if (primaryDisplay is not null &&
+            _displayManager.TryGetCurrentRefreshRate(primaryDisplay.DeviceName, out var current, out _))
         {
-            _statusItem.Text = $"Current: {current} Hz";
+            _statusItem.Text = $"{primaryDisplay.Label}: {current} Hz";
             _notifyIcon.Text = TrimTooltip($"RefreshToggle: {current} Hz ({_config.RateA}/{_config.RateB})");
             UpdateIcon(TrayIconHelper.CreateForRate(current, _config));
         }
@@ -168,6 +197,8 @@ internal sealed class TrayApp : IDisposable
             _notifyIcon.Text = TrimTooltip("RefreshToggle");
             UpdateIcon(TrayIconHelper.CreateUnknown());
         }
+
+        UpdateDisplayToggleItemText();
     }
 
     private void UpdateIcon(Icon newIcon)
@@ -190,6 +221,82 @@ internal sealed class TrayApp : IDisposable
     {
         const int maxLength = 63;
         return text.Length <= maxLength ? text : text[..maxLength];
+    }
+
+    private void RefreshDisplayState()
+    {
+        _displays = _displayManager.GetDisplays();
+        RebuildDisplayToggleItems();
+        UpdateStatusText();
+    }
+
+    private void RebuildDisplayToggleItems()
+    {
+        foreach (var (_, item) in _displayToggleItems)
+        {
+            _menu.Items.Remove(item);
+            item.Dispose();
+        }
+        _displayToggleItems.Clear();
+
+        if (_noDisplaysItem is not null)
+        {
+            _menu.Items.Remove(_noDisplaysItem);
+            _noDisplaysItem.Dispose();
+            _noDisplaysItem = null;
+        }
+
+        if (_displays.Count == 0)
+        {
+            _noDisplaysItem = new ToolStripMenuItem("No displays detected") { Enabled = false };
+            _menu.Items.Insert(_menu.Items.IndexOf(_displaySectionEndSeparator), _noDisplaysItem);
+            return;
+        }
+
+        foreach (var display in _displays)
+        {
+            var item = new ToolStripMenuItem(display.Label);
+            item.Click += (_, _) => ToggleRefreshRate(display);
+            _displayToggleItems.Add((display, item));
+            _menu.Items.Insert(_menu.Items.IndexOf(_displaySectionEndSeparator), item);
+        }
+    }
+
+    private void UpdateDisplayToggleItemText()
+    {
+        foreach (var (display, item) in _displayToggleItems)
+        {
+            if (_displayManager.TryGetCurrentRefreshRate(display.DeviceName, out var current, out _))
+            {
+                var target = DetermineTargetRate(current);
+                item.Text = $"{display.Label}: {current} Hz → {target} Hz";
+                item.Enabled = true;
+            }
+            else
+            {
+                item.Text = $"{display.Label}: Unknown";
+                item.Enabled = false;
+            }
+        }
+    }
+
+    private DisplayInfo? GetPrimaryOrFirstDisplay() =>
+        _displays.FirstOrDefault(d => d.IsPrimary) ?? _displays.FirstOrDefault();
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_menu.InvokeRequired)
+        {
+            _menu.BeginInvoke((MethodInvoker)RefreshDisplayState);
+            return;
+        }
+
+        RefreshDisplayState();
     }
 
     private void ToggleStartWithWindows()
