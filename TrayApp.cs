@@ -13,6 +13,8 @@ internal sealed class TrayApp : IDisposable
     private readonly ToolStripSeparator _displaySectionStartSeparator;
     private readonly ToolStripSeparator _displaySectionEndSeparator;
     private readonly List<(DisplayInfo Display, ToolStripMenuItem Item)> _displayToggleItems = [];
+    private readonly ToolStripMenuItem _setRateAItem;
+    private readonly ToolStripMenuItem _setRateBItem;
     private readonly ToolStripMenuItem _startWithWindowsItem;
     private readonly ToolStripMenuItem _uninstallItem;
     private readonly ToolStripMenuItem _exitItem;
@@ -73,6 +75,8 @@ internal sealed class TrayApp : IDisposable
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _displaySectionStartSeparator = new ToolStripSeparator();
         _displaySectionEndSeparator = new ToolStripSeparator();
+        _setRateAItem = new ToolStripMenuItem();
+        _setRateBItem = new ToolStripMenuItem();
         _startWithWindowsItem = new ToolStripMenuItem("Start with Windows")
         {
             Checked = startupEnabled,
@@ -84,6 +88,8 @@ internal sealed class TrayApp : IDisposable
         };
         _exitItem = new ToolStripMenuItem("Exit");
 
+        _setRateAItem.Click += (_, _) => ConfigureRateA();
+        _setRateBItem.Click += (_, _) => ConfigureRateB();
         _startWithWindowsItem.Click += (_, _) => ToggleStartWithWindows();
         _uninstallItem.Click += (_, _) => Uninstall();
         _exitItem.Click += (_, _) => ExitApplication();
@@ -92,6 +98,8 @@ internal sealed class TrayApp : IDisposable
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(_displaySectionStartSeparator);
         _menu.Items.Add(_displaySectionEndSeparator);
+        _menu.Items.Add(_setRateAItem);
+        _menu.Items.Add(_setRateBItem);
         _menu.Items.Add(_startWithWindowsItem);
         _menu.Items.Add(_uninstallItem);
         _menu.Items.Add(_exitItem);
@@ -205,6 +213,8 @@ internal sealed class TrayApp : IDisposable
 
     private void UpdateStatusText()
     {
+        UpdateRateMenuItems();
+
         var primaryDisplay = GetPrimaryOrFirstDisplay();
         if (primaryDisplay is not null &&
             _displayManager.TryGetCurrentRefreshRate(primaryDisplay.DeviceName, out var current, out _))
@@ -221,6 +231,15 @@ internal sealed class TrayApp : IDisposable
         }
 
         UpdateDisplayToggleItemText();
+    }
+
+    private void UpdateRateMenuItems()
+    {
+        _setRateAItem.Text = $"Set Rate A... ({_config.RateA} Hz)";
+        _setRateBItem.Text = $"Set Rate B... ({_config.RateB} Hz)";
+        var hasDisplay = GetPrimaryOrFirstDisplay() is not null;
+        _setRateAItem.Enabled = hasDisplay;
+        _setRateBItem.Enabled = hasDisplay;
     }
 
     private void UpdateIcon(Icon newIcon)
@@ -423,6 +442,168 @@ internal sealed class TrayApp : IDisposable
     private static void ExitApplication()
     {
         Application.Exit();
+    }
+
+    private void ConfigureRateA()
+    {
+        ConfigureRate(
+            title: "Set Rate A",
+            selectedRate: _config.RateA,
+            configureRateA: true);
+    }
+
+    private void ConfigureRateB()
+    {
+        ConfigureRate(
+            title: "Set Rate B",
+            selectedRate: _config.RateB,
+            configureRateA: false);
+    }
+
+    private void ConfigureRate(string title, int selectedRate, bool configureRateA)
+    {
+        var display = GetPrimaryOrFirstDisplay();
+        if (display is null)
+        {
+            ShowError("No displays detected.");
+            return;
+        }
+
+        var supportedRates = _displayManager.GetSupportedRefreshRates(display.DeviceName);
+        if (supportedRates.Count == 0)
+        {
+            ShowError($"No supported refresh rates found for {display.Label}.");
+            return;
+        }
+
+        var newRate = ShowRateSelectionDialog(title, display.Label, supportedRates, selectedRate);
+        if (newRate is null)
+        {
+            return;
+        }
+
+        var nextRateA = configureRateA ? newRate.Value : _config.RateA;
+        var nextRateB = configureRateA ? _config.RateB : newRate.Value;
+
+        if (!TryValidateRates(nextRateA, nextRateB, out var validateError))
+        {
+            ShowError(validateError);
+            return;
+        }
+
+        var previousRateA = _config.RateA;
+        var previousRateB = _config.RateB;
+        _config.RateA = nextRateA;
+        _config.RateB = nextRateB;
+
+        try
+        {
+            _config.Save();
+            UpdateStatusText();
+        }
+        catch (Exception ex)
+        {
+            _config.RateA = previousRateA;
+            _config.RateB = previousRateB;
+            ShowError($"Could not save refresh rate settings: {ex.Message}");
+        }
+    }
+
+    private static bool TryValidateRates(int rateA, int rateB, out string error)
+    {
+        if (rateA <= 0 || rateB <= 0)
+        {
+            error = "Refresh rates must be greater than 0.";
+            return false;
+        }
+
+        if (rateA == rateB)
+        {
+            error = "Rate A and Rate B must be different.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private static int? ShowRateSelectionDialog(
+        string title,
+        string displayLabel,
+        IReadOnlyList<int> supportedRates,
+        int configuredRate)
+    {
+        using var dialog = new Form
+        {
+            Text = title,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterScreen,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(280, 120)
+        };
+
+        var label = new Label
+        {
+            AutoSize = true,
+            Text = $"{displayLabel}:",
+            Left = 12,
+            Top = 15
+        };
+
+        var combo = new ComboBox
+        {
+            Left = 12,
+            Top = 40,
+            Width = 256,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+
+        foreach (var rate in supportedRates)
+        {
+            combo.Items.Add($"{rate} Hz");
+        }
+
+        var selectedIndex = -1;
+        for (var i = 0; i < supportedRates.Count; i++)
+        {
+            if (supportedRates[i] == configuredRate)
+            {
+                selectedIndex = i;
+                break;
+            }
+        }
+        combo.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 0;
+
+        var applyButton = new Button
+        {
+            Text = "Apply",
+            Left = 112,
+            Top = 80,
+            Width = 75,
+            DialogResult = DialogResult.OK
+        };
+
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            Left = 193,
+            Top = 80,
+            Width = 75,
+            DialogResult = DialogResult.Cancel
+        };
+
+        dialog.Controls.Add(label);
+        dialog.Controls.Add(combo);
+        dialog.Controls.Add(applyButton);
+        dialog.Controls.Add(cancelButton);
+        dialog.AcceptButton = applyButton;
+        dialog.CancelButton = cancelButton;
+
+        return dialog.ShowDialog() == DialogResult.OK && combo.SelectedIndex >= 0
+            ? supportedRates[combo.SelectedIndex]
+            : null;
     }
 
     private void Uninstall()

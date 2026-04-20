@@ -95,6 +95,26 @@ internal sealed class DisplayManager
         return true;
     }
 
+    public IReadOnlyList<int> GetSupportedRefreshRates(string? deviceName = null)
+    {
+        var rates = new HashSet<int>();
+        for (var modeIndex = 0; ; modeIndex++)
+        {
+            var mode = CreateDevMode();
+            if (!EnumDisplaySettings(deviceName, modeIndex, ref mode))
+            {
+                break;
+            }
+
+            if (mode.dmDisplayFrequency > 0)
+            {
+                rates.Add(mode.dmDisplayFrequency);
+            }
+        }
+
+        return rates.OrderBy(rate => rate).ToArray();
+    }
+
     private static DEVMODE CreateDevMode()
     {
         var mode = new DEVMODE();

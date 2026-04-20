@@ -37,7 +37,8 @@ On first launch, a config file is created at `%APPDATA%\RefreshToggle\config.jso
 }
 ```
 
-Edit `RateA` and `RateB` to set your preferred refresh rates. The app reloads the config on each toggle.
+You can configure `RateA` and `RateB` directly from the tray menu using **Set Rate A...** / **Set Rate B...**.
+The app lists supported rates for your primary display and saves changes to `config.json` automatically.
 
 > `StartWithWindows` is managed automatically by the tray menu — no need to edit it manually.
 
@@ -47,6 +48,7 @@ Edit `RateA` and `RateB` to set your preferred refresh rates. The app reloads th
 |--------|-------------|
 | **Left-click icon** | Toggle refresh rate |
 | **Per-display entries** | Toggle rate for a specific monitor |
+| **Set Rate A... / Set Rate B...** | Pick configured target rates from supported display modes |
 | **Start with Windows** | Register / unregister auto-start |
 | **Uninstall** | Remove installed copy and startup entry |
 | **Exit** | Close the app |
