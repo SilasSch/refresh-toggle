@@ -573,7 +573,7 @@ internal sealed class TrayApp : IDisposable
             combo.Items.Add($"{rate} Hz");
         }
 
-        var selectedIndex = supportedRates.ToList().FindIndex(rate => rate == configuredRate);
+        var selectedIndex = FindRateIndex(supportedRates, configuredRate);
         combo.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 0;
 
         var applyButton = new Button
@@ -604,6 +604,19 @@ internal sealed class TrayApp : IDisposable
         return dialog.ShowDialog() == DialogResult.OK && combo.SelectedIndex >= 0
             ? supportedRates[combo.SelectedIndex]
             : null;
+    }
+
+    private static int FindRateIndex(IReadOnlyList<int> rates, int rate)
+    {
+        for (var i = 0; i < rates.Count; i++)
+        {
+            if (rates[i] == rate)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private void Uninstall()
