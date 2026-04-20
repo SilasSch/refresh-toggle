@@ -482,8 +482,16 @@ internal sealed class TrayApp : IDisposable
             return;
         }
 
-        var nextRateA = configureRateA ? newRate.Value : _config.RateA;
-        var nextRateB = configureRateA ? _config.RateB : newRate.Value;
+        var nextRateA = _config.RateA;
+        var nextRateB = _config.RateB;
+        if (configureRateA)
+        {
+            nextRateA = newRate.Value;
+        }
+        else
+        {
+            nextRateB = newRate.Value;
+        }
 
         if (!TryValidateRates(nextRateA, nextRateB, out var validateError))
         {
@@ -565,15 +573,7 @@ internal sealed class TrayApp : IDisposable
             combo.Items.Add($"{rate} Hz");
         }
 
-        var selectedIndex = -1;
-        for (var i = 0; i < supportedRates.Count; i++)
-        {
-            if (supportedRates[i] == configuredRate)
-            {
-                selectedIndex = i;
-                break;
-            }
-        }
+        var selectedIndex = supportedRates.ToList().FindIndex(rate => rate == configuredRate);
         combo.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 0;
 
         var applyButton = new Button
