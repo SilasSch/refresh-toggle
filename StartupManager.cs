@@ -9,7 +9,12 @@ internal static class StartupManager
 
     public static void Enable()
     {
-        var exePath = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot determine executable path.");
+        var exePath = InstallationManager.InstalledExecutablePath;
+        if (!File.Exists(exePath))
+        {
+            throw new InvalidOperationException($"Installed executable was not found: {exePath}");
+        }
+
         using var key = Registry.CurrentUser.CreateSubKey(RegistryKeyPath, writable: true)
             ?? throw new InvalidOperationException($"Cannot create or open registry key: {RegistryKeyPath}");
         key.SetValue(AppName, $"\"{exePath}\"");
@@ -26,10 +31,11 @@ internal static class StartupManager
         using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath);
         if (key?.GetValue(AppName) is not string storedValue)
             return false;
-        var exePath = Environment.ProcessPath;
+        var exePath = InstallationManager.InstalledExecutablePath;
+        if (!File.Exists(exePath))
+            return false;
         var normalizedStoredValue = storedValue.Trim().Trim('"');
-        return exePath is not null
-            && string.Equals(normalizedStoredValue, exePath, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(normalizedStoredValue, exePath, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

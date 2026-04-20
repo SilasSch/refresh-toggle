@@ -14,6 +14,7 @@ internal sealed class TrayApp : IDisposable
     private readonly ToolStripSeparator _displaySectionEndSeparator;
     private readonly List<(DisplayInfo Display, ToolStripMenuItem Item)> _displayToggleItems = [];
     private readonly ToolStripMenuItem _startWithWindowsItem;
+    private readonly ToolStripMenuItem _uninstallItem;
     private readonly ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
     private IReadOnlyList<DisplayInfo> _displays = [];
@@ -21,7 +22,7 @@ internal sealed class TrayApp : IDisposable
     private Icon? _currentIcon;
     private volatile bool _disposed;
 
-    public TrayApp()
+    public TrayApp(bool showInstallNotification, string? installError, string? startupMigrationError)
     {
         _config = AppConfig.Load();
 
@@ -77,9 +78,14 @@ internal sealed class TrayApp : IDisposable
             Checked = startupEnabled,
             Enabled = startupStateAvailable
         };
+        _uninstallItem = new ToolStripMenuItem("Uninstall")
+        {
+            Enabled = InstallationManager.HasInstalledCopy()
+        };
         _exitItem = new ToolStripMenuItem("Exit");
 
         _startWithWindowsItem.Click += (_, _) => ToggleStartWithWindows();
+        _uninstallItem.Click += (_, _) => Uninstall();
         _exitItem.Click += (_, _) => ExitApplication();
 
         _menu = new ContextMenuStrip();
@@ -87,6 +93,7 @@ internal sealed class TrayApp : IDisposable
         _menu.Items.Add(_displaySectionStartSeparator);
         _menu.Items.Add(_displaySectionEndSeparator);
         _menu.Items.Add(_startWithWindowsItem);
+        _menu.Items.Add(_uninstallItem);
         _menu.Items.Add(_exitItem);
         _menu.Opening += (_, _) => RefreshDisplayState();
 
@@ -107,6 +114,21 @@ internal sealed class TrayApp : IDisposable
         if (deferredError is not null)
         {
             ShowError(deferredError);
+        }
+
+        if (showInstallNotification)
+        {
+            ShowInfo(@"Installed to %LOCALAPPDATA%\RefreshToggle");
+        }
+
+        if (!string.IsNullOrWhiteSpace(installError))
+        {
+            ShowError(installError);
+        }
+
+        if (!string.IsNullOrWhiteSpace(startupMigrationError))
+        {
+            ShowError(startupMigrationError);
         }
     }
 
@@ -215,6 +237,14 @@ internal sealed class TrayApp : IDisposable
         _notifyIcon.BalloonTipIcon = ToolTipIcon.Error;
         _notifyIcon.ShowBalloonTip(4000);
         UpdateStatusText();
+    }
+
+    private void ShowInfo(string message)
+    {
+        _notifyIcon.BalloonTipTitle = "RefreshToggle";
+        _notifyIcon.BalloonTipText = message;
+        _notifyIcon.BalloonTipIcon = ToolTipIcon.Info;
+        _notifyIcon.ShowBalloonTip(4000);
     }
 
     private static string TrimTooltip(string text)
@@ -393,5 +423,43 @@ internal sealed class TrayApp : IDisposable
     private static void ExitApplication()
     {
         Application.Exit();
+    }
+
+    private void Uninstall()
+    {
+        try
+        {
+            StartupManager.Disable();
+            _startWithWindowsItem.Checked = false;
+            _config.StartWithWindows = false;
+            _config.Save();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Could not disable startup entry: {ex.Message}");
+            return;
+        }
+
+        try
+        {
+            var exitAfterUninstall = InstallationManager.RemoveInstalledCopy();
+
+            if (exitAfterUninstall)
+            {
+                ShowInfo("Uninstall started. RefreshToggle will now exit.");
+                ExitApplication();
+                return;
+            }
+
+            ShowInfo(@"Uninstalled from %LOCALAPPDATA%\RefreshToggle");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Could not remove installed copy: {ex.Message}");
+        }
+        finally
+        {
+            _uninstallItem.Enabled = InstallationManager.HasInstalledCopy();
+        }
     }
 }
