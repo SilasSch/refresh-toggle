@@ -95,6 +95,50 @@ internal sealed class DisplayManager
         return true;
     }
 
+    public bool TryGetSupportedRefreshRates(string? deviceName, out IReadOnlyList<int> rates, out string error)
+    {
+        var currentMode = CreateDevMode();
+        if (!EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref currentMode))
+        {
+            rates = [];
+            error = $"EnumDisplaySettings failed: {new Win32Exception(Marshal.GetLastWin32Error()).Message}";
+            return false;
+        }
+
+        var distinctRates = new HashSet<int>();
+        for (var modeIndex = 0; ; modeIndex++)
+        {
+            var mode = CreateDevMode();
+            if (!EnumDisplaySettings(deviceName, modeIndex, ref mode))
+            {
+                break;
+            }
+
+            if (mode.dmDisplayFrequency <= 1)
+            {
+                continue;
+            }
+
+            if (mode.dmPelsWidth != currentMode.dmPelsWidth || mode.dmPelsHeight != currentMode.dmPelsHeight)
+            {
+                continue;
+            }
+
+            if (currentMode.dmBitsPerPel > 0 &&
+                mode.dmBitsPerPel > 0 &&
+                mode.dmBitsPerPel != currentMode.dmBitsPerPel)
+            {
+                continue;
+            }
+
+            distinctRates.Add(mode.dmDisplayFrequency);
+        }
+
+        rates = distinctRates.OrderBy(rate => rate).ToArray();
+        error = string.Empty;
+        return true;
+    }
+
     private static DEVMODE CreateDevMode()
     {
         var mode = new DEVMODE();
