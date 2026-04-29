@@ -395,14 +395,28 @@ internal sealed class TrayApp : IDisposable
     private void RegisterConfiguredHotkey()
     {
         if (!HotkeyManager.TryParse(_config.HotkeyModifiers, _config.HotkeyKey,
-                out var modifiers, out var key, out var error))
+                out var modifiers, out var key, out _))
         {
-            // Fall back to Ctrl+Shift+R if config is invalid.
-            _hotkeyManager.TryRegister(ModifierKeys.Control | ModifierKeys.Shift, Keys.R, out _);
-            return;
+            // Config is invalid — reset to defaults and register those.
+            modifiers = ModifierKeys.Control | ModifierKeys.Shift;
+            key = Keys.R;
+            _config.HotkeyModifiers = FormatModifiers(modifiers);
+            _config.HotkeyKey = key.ToString();
+
+            try
+            {
+                _config.Save();
+            }
+            catch
+            {
+                // Best effort — the in-memory defaults still apply.
+            }
         }
 
-        _hotkeyManager.TryRegister(modifiers, key, out _);
+        if (!_hotkeyManager.TryRegister(modifiers, key, out var error))
+        {
+            ShowError($"Could not register hotkey ({HotkeyManager.GetDisplayText(modifiers, key)}): {error}");
+        }
     }
 
     private void ConfigureHotkey()
@@ -471,13 +485,13 @@ internal sealed class TrayApp : IDisposable
             MaximizeBox = false,
             MinimizeBox = false,
             ShowInTaskbar = false,
-            ClientSize = new Size(300, 180)
+            ClientSize = new Size(300, 210)
         };
 
         var instructionLabel = new Label
         {
             AutoSize = true,
-            Text = "Press the desired key combination:",
+            Text = "Select the desired key combination:",
             Left = 12,
             Top = 12
         };
@@ -516,6 +530,15 @@ internal sealed class TrayApp : IDisposable
             Top = 65,
             Width = 60,
             Checked = currentModifiers.HasFlag(ModifierKeys.Shift)
+        };
+
+        var winCheckBox = new CheckBox
+        {
+            Text = "Win",
+            Left = 216,
+            Top = 65,
+            Width = 60,
+            Checked = currentModifiers.HasFlag(ModifierKeys.Windows)
         };
 
         var keyLabel = new Label
@@ -568,28 +591,30 @@ internal sealed class TrayApp : IDisposable
             if (ctrlCheckBox.Checked) mods |= ModifierKeys.Control;
             if (altCheckBox.Checked) mods |= ModifierKeys.Alt;
             if (shiftCheckBox.Checked) mods |= ModifierKeys.Shift;
+            if (winCheckBox.Checked) mods |= ModifierKeys.Windows;
 
             if (mods != 0 && keyCombo.SelectedIndex >= 0)
             {
-                var key = commonKeys[keyCombo.SelectedIndex];
-                previewLabel.Text = $"Preview: {HotkeyManager.GetDisplayText(mods, key)}";
+                var selectedKey = commonKeys[keyCombo.SelectedIndex];
+                previewLabel.Text = $"Preview: {HotkeyManager.GetDisplayText(mods, selectedKey)}";
             }
             else
             {
-                previewLabel.Text = "Select modifiers and a key.";
+                previewLabel.Text = "Select at least one modifier and a key.";
             }
         }
 
         ctrlCheckBox.CheckedChanged += UpdatePreview;
         altCheckBox.CheckedChanged += UpdatePreview;
         shiftCheckBox.CheckedChanged += UpdatePreview;
+        winCheckBox.CheckedChanged += UpdatePreview;
         keyCombo.SelectedIndexChanged += UpdatePreview;
 
         var applyButton = new Button
         {
             Text = "Apply",
             Left = 112,
-            Top = 150,
+            Top = 175,
             Width = 75,
             DialogResult = DialogResult.OK
         };
@@ -598,7 +623,7 @@ internal sealed class TrayApp : IDisposable
         {
             Text = "Cancel",
             Left = 193,
-            Top = 150,
+            Top = 175,
             Width = 75,
             DialogResult = DialogResult.Cancel
         };
@@ -608,6 +633,7 @@ internal sealed class TrayApp : IDisposable
         dialog.Controls.Add(ctrlCheckBox);
         dialog.Controls.Add(altCheckBox);
         dialog.Controls.Add(shiftCheckBox);
+        dialog.Controls.Add(winCheckBox);
         dialog.Controls.Add(keyLabel);
         dialog.Controls.Add(keyCombo);
         dialog.Controls.Add(previewLabel);
@@ -627,8 +653,9 @@ internal sealed class TrayApp : IDisposable
         if (ctrlCheckBox.Checked) modifiers |= ModifierKeys.Control;
         if (altCheckBox.Checked) modifiers |= ModifierKeys.Alt;
         if (shiftCheckBox.Checked) modifiers |= ModifierKeys.Shift;
+        if (winCheckBox.Checked) modifiers |= ModifierKeys.Windows;
 
-        if (modifiers == 0)
+        if (modifiers == ModifierKeys.None)
         {
             return null;
         }

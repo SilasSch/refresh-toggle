@@ -38,6 +38,19 @@ internal sealed class AppConfig
                 return fallback;
             }
 
+            // Normalize hotkey fields — System.Text.Json can deserialize explicit null
+            // into non-nullable string properties, which would cause NullReferenceException
+            // downstream when HotkeyManager.TryParse calls Split().
+            if (string.IsNullOrWhiteSpace(config.HotkeyModifiers))
+            {
+                config.HotkeyModifiers = "Ctrl+Shift";
+            }
+
+            if (string.IsNullOrWhiteSpace(config.HotkeyKey))
+            {
+                config.HotkeyKey = "R";
+            }
+
             return config;
         }
         catch

@@ -8,6 +8,7 @@ internal sealed class HotkeyManager : IDisposable
 {
     private const int WM_HOTKEY = 0x0312;
     private const int HOTKEY_ID = 1;
+    private const uint MOD_NOREPEAT = 0x4000;
 
     private readonly HiddenWindow _window;
     private bool _registered;
@@ -27,7 +28,7 @@ internal sealed class HotkeyManager : IDisposable
     {
         Unregister();
 
-        if (!RegisterHotKey(_window.Handle, HOTKEY_ID, (uint)modifiers, (uint)key))
+        if (!RegisterHotKey(_window.Handle, HOTKEY_ID, (uint)modifiers | MOD_NOREPEAT, (uint)key))
         {
             var errorCode = Marshal.GetLastWin32Error();
             error = $"RegisterHotKey failed (error {errorCode}). The combination may be in use by another application.";
@@ -75,27 +76,42 @@ internal sealed class HotkeyManager : IDisposable
 
     /// <summary>
     /// Parses a modifier+key combination from config values into the Win32 types.
+    /// Returns false if the input is invalid — never throws.
     /// </summary>
-    public static bool TryParse(string modifierString, string keyString, out ModifierKeys modifiers, out Keys key, out string? error)
+    public static bool TryParse(string? modifierString, string? keyString, out ModifierKeys modifiers, out Keys key, out string? error)
     {
-        modifiers = 0;
+        modifiers = ModifierKeys.None;
         key = Keys.None;
         error = null;
 
-        // Parse modifiers
-        foreach (var part in modifierString.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        if (string.IsNullOrWhiteSpace(modifierString) || string.IsNullOrWhiteSpace(keyString))
         {
-            modifiers |= part.ToLowerInvariant() switch
+            error = "Modifier or key is empty.";
+            return false;
+        }
+
+        // Parse modifiers
+        foreach (var part in modifierString!.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parsed = part.ToLowerInvariant() switch
             {
-                "ctrl" or "control" => ModifierKeys.Control,
+                "ctrl" or "control" => (ModifierKeys?)ModifierKeys.Control,
                 "alt" => ModifierKeys.Alt,
                 "shift" => ModifierKeys.Shift,
                 "win" or "windows" => ModifierKeys.Windows,
-                _ => throw new ArgumentException($"Unknown modifier: {part}")
+                _ => null
             };
+
+            if (parsed is null)
+            {
+                error = $"Unknown modifier: {part}";
+                return false;
+            }
+
+            modifiers |= parsed.Value;
         }
 
-        if (modifiers == 0)
+        if (modifiers == ModifierKeys.None)
         {
             error = "At least one modifier key (Ctrl, Alt, Shift, Win) is required.";
             return false;
@@ -108,7 +124,8 @@ internal sealed class HotkeyManager : IDisposable
             return false;
         }
 
-        // Strip modifier flags that may be part of the Keys enum value (e.g. "D" vs "D1")
+        // Strip modifier flags that may be encoded in the high bits of the Keys enum value
+        // (e.g. Keys.R is 82 which is clean, but Keys.ShiftKey would carry modifier bits).
         key = key & ~Keys.Shift & ~Keys.Control & ~Keys.Alt;
 
         return true;
