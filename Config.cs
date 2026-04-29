@@ -7,6 +7,8 @@ internal sealed class AppConfig
     public int RateA { get; set; } = 60;
     public int RateB { get; set; } = 120;
     public bool StartWithWindows { get; set; } = false;
+    public string HotkeyModifiers { get; set; } = "Ctrl+Shift";
+    public string HotkeyKey { get; set; } = "R";
 
     private static string ConfigDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RefreshToggle");

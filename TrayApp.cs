@@ -15,10 +15,12 @@ internal sealed class TrayApp : IDisposable
     private readonly List<(DisplayInfo Display, ToolStripMenuItem Item)> _displayToggleItems = [];
     private readonly ToolStripMenuItem _setRateAItem;
     private readonly ToolStripMenuItem _setRateBItem;
+    private readonly ToolStripMenuItem _hotkeyMenuItem;
     private readonly ToolStripMenuItem _startWithWindowsItem;
     private readonly ToolStripMenuItem _uninstallItem;
     private readonly ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
+    private readonly HotkeyManager _hotkeyManager;
     private IReadOnlyList<DisplayInfo> _displays = [];
     private ToolStripMenuItem? _noDisplaysItem;
     private Icon? _currentIcon;
@@ -77,6 +79,7 @@ internal sealed class TrayApp : IDisposable
         _displaySectionEndSeparator = new ToolStripSeparator();
         _setRateAItem = new ToolStripMenuItem();
         _setRateBItem = new ToolStripMenuItem();
+        _hotkeyMenuItem = new ToolStripMenuItem("Hotkey: ...");
         _startWithWindowsItem = new ToolStripMenuItem("Start with Windows")
         {
             Checked = startupEnabled,
@@ -90,6 +93,7 @@ internal sealed class TrayApp : IDisposable
 
         _setRateAItem.Click += (_, _) => ConfigureRateA();
         _setRateBItem.Click += (_, _) => ConfigureRateB();
+        _hotkeyMenuItem.Click += (_, _) => ConfigureHotkey();
         _startWithWindowsItem.Click += (_, _) => ToggleStartWithWindows();
         _uninstallItem.Click += (_, _) => Uninstall();
         _exitItem.Click += (_, _) => ExitApplication();
@@ -100,6 +104,7 @@ internal sealed class TrayApp : IDisposable
         _menu.Items.Add(_displaySectionEndSeparator);
         _menu.Items.Add(_setRateAItem);
         _menu.Items.Add(_setRateBItem);
+        _menu.Items.Add(_hotkeyMenuItem);
         _menu.Items.Add(_startWithWindowsItem);
         _menu.Items.Add(_uninstallItem);
         _menu.Items.Add(_exitItem);
@@ -116,6 +121,10 @@ internal sealed class TrayApp : IDisposable
         _notifyIcon.MouseClick += NotifyIconOnMouseClick;
         _notifyIcon.DoubleClick += (_, _) => ToggleRefreshRate();
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+
+        _hotkeyManager = new HotkeyManager();
+        _hotkeyManager.HotkeyPressed += (_, _) => OnGlobalHotkey();
+        RegisterConfiguredHotkey();
 
         RefreshDisplayState();
 
@@ -148,6 +157,7 @@ internal sealed class TrayApp : IDisposable
         }
 
         _disposed = true;
+        _hotkeyManager.Dispose();
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
@@ -162,6 +172,22 @@ internal sealed class TrayApp : IDisposable
         {
             ToggleRefreshRate();
         }
+    }
+
+    private void OnGlobalHotkey()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_menu.InvokeRequired)
+        {
+            _menu.BeginInvoke((MethodInvoker)ToggleRefreshRate);
+            return;
+        }
+
+        ToggleRefreshRate();
     }
 
     private void ToggleRefreshRate()
@@ -237,9 +263,23 @@ internal sealed class TrayApp : IDisposable
     {
         _setRateAItem.Text = $"Set Rate A... ({_config.RateA} Hz)";
         _setRateBItem.Text = $"Set Rate B... ({_config.RateB} Hz)";
+        UpdateHotkeyMenuItemText();
         var hasDisplay = GetPrimaryOrFirstDisplay() is not null;
         _setRateAItem.Enabled = hasDisplay;
         _setRateBItem.Enabled = hasDisplay;
+    }
+
+    private void UpdateHotkeyMenuItemText()
+    {
+        if (HotkeyManager.TryParse(_config.HotkeyModifiers, _config.HotkeyKey,
+                out var modifiers, out var key, out _))
+        {
+            _hotkeyMenuItem.Text = $"Hotkey: {HotkeyManager.GetDisplayText(modifiers, key)}";
+        }
+        else
+        {
+            _hotkeyMenuItem.Text = "Hotkey: (invalid — click to fix)";
+        }
     }
 
     private void UpdateIcon(Icon newIcon)
@@ -348,6 +388,264 @@ internal sealed class TrayApp : IDisposable
         RefreshDisplayState();
     }
 
+    // -----------------------------------------------------------------------
+    // Hotkey
+    // -----------------------------------------------------------------------
+
+    private void RegisterConfiguredHotkey()
+    {
+        if (!HotkeyManager.TryParse(_config.HotkeyModifiers, _config.HotkeyKey,
+                out var modifiers, out var key, out var error))
+        {
+            // Fall back to Ctrl+Shift+R if config is invalid.
+            _hotkeyManager.TryRegister(ModifierKeys.Control | ModifierKeys.Shift, Keys.R, out _);
+            return;
+        }
+
+        _hotkeyManager.TryRegister(modifiers, key, out _);
+    }
+
+    private void ConfigureHotkey()
+    {
+        if (!HotkeyManager.TryParse(_config.HotkeyModifiers, _config.HotkeyKey,
+                out var currentModifiers, out var currentKey, out _))
+        {
+            currentModifiers = ModifierKeys.Control | ModifierKeys.Shift;
+            currentKey = Keys.R;
+        }
+
+        var result = ShowHotkeyDialog(currentModifiers, currentKey);
+        if (result is null)
+        {
+            return;
+        }
+
+        var (newModifiers, newKey) = result.Value;
+
+        var previousModifiers = _config.HotkeyModifiers;
+        var previousKey = _config.HotkeyKey;
+        _config.HotkeyModifiers = FormatModifiers(newModifiers);
+        _config.HotkeyKey = newKey.ToString();
+
+        if (!_hotkeyManager.TryReregister(newModifiers, newKey, out var hotkeyError))
+        {
+            _config.HotkeyModifiers = previousModifiers;
+            _config.HotkeyKey = previousKey;
+            ShowError($"Could not register hotkey: {hotkeyError}");
+            return;
+        }
+
+        try
+        {
+            _config.Save();
+            UpdateStatusText();
+        }
+        catch (Exception ex)
+        {
+            _config.HotkeyModifiers = previousModifiers;
+            _config.HotkeyKey = previousKey;
+            _hotkeyManager.TryReregister(currentModifiers, currentKey, out _);
+            ShowError($"Could not save hotkey setting: {ex.Message}");
+        }
+    }
+
+    private static string FormatModifiers(ModifierKeys modifiers)
+    {
+        var parts = new List<string>();
+        if (modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
+        if (modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
+        if (modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
+        if (modifiers.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
+        return string.Join("+", parts);
+    }
+
+    private static (ModifierKeys Modifiers, Keys Key)? ShowHotkeyDialog(
+        ModifierKeys currentModifiers,
+        Keys currentKey)
+    {
+        using var dialog = new Form
+        {
+            Text = "Configure Hotkey",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterScreen,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(300, 180)
+        };
+
+        var instructionLabel = new Label
+        {
+            AutoSize = true,
+            Text = "Press the desired key combination:",
+            Left = 12,
+            Top = 12
+        };
+
+        var currentLabel = new Label
+        {
+            AutoSize = true,
+            Text = $"Current: {HotkeyManager.GetDisplayText(currentModifiers, currentKey)}",
+            Left = 12,
+            Top = 35,
+            ForeColor = SystemColors.GrayText
+        };
+
+        var ctrlCheckBox = new CheckBox
+        {
+            Text = "Ctrl",
+            Left = 12,
+            Top = 65,
+            Width = 60,
+            Checked = currentModifiers.HasFlag(ModifierKeys.Control)
+        };
+
+        var altCheckBox = new CheckBox
+        {
+            Text = "Alt",
+            Left = 80,
+            Top = 65,
+            Width = 60,
+            Checked = currentModifiers.HasFlag(ModifierKeys.Alt)
+        };
+
+        var shiftCheckBox = new CheckBox
+        {
+            Text = "Shift",
+            Left = 148,
+            Top = 65,
+            Width = 60,
+            Checked = currentModifiers.HasFlag(ModifierKeys.Shift)
+        };
+
+        var keyLabel = new Label
+        {
+            AutoSize = true,
+            Text = "Key:",
+            Left = 12,
+            Top = 100
+        };
+
+        var keyCombo = new ComboBox
+        {
+            Left = 50,
+            Top = 97,
+            Width = 238,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+
+        var commonKeys = new Keys[]
+        {
+            Keys.R, Keys.T, Keys.F, Keys.G, Keys.V, Keys.B,
+            Keys.Space, Keys.F1, Keys.F2, Keys.F3, Keys.F4, Keys.F5, Keys.F6,
+            Keys.F7, Keys.F8, Keys.F9, Keys.F10, Keys.F11, Keys.F12
+        };
+
+        var selectedIndex = 0;
+        for (var i = 0; i < commonKeys.Length; i++)
+        {
+            keyCombo.Items.Add(commonKeys[i].ToString());
+            if (commonKeys[i] == currentKey)
+            {
+                selectedIndex = i;
+            }
+        }
+
+        keyCombo.SelectedIndex = selectedIndex;
+
+        var previewLabel = new Label
+        {
+            AutoSize = true,
+            Text = "",
+            Left = 12,
+            Top = 130,
+            ForeColor = SystemColors.HotTrack
+        };
+
+        void UpdatePreview(object? s, EventArgs e)
+        {
+            var mods = ModifierKeys.None;
+            if (ctrlCheckBox.Checked) mods |= ModifierKeys.Control;
+            if (altCheckBox.Checked) mods |= ModifierKeys.Alt;
+            if (shiftCheckBox.Checked) mods |= ModifierKeys.Shift;
+
+            if (mods != 0 && keyCombo.SelectedIndex >= 0)
+            {
+                var key = commonKeys[keyCombo.SelectedIndex];
+                previewLabel.Text = $"Preview: {HotkeyManager.GetDisplayText(mods, key)}";
+            }
+            else
+            {
+                previewLabel.Text = "Select modifiers and a key.";
+            }
+        }
+
+        ctrlCheckBox.CheckedChanged += UpdatePreview;
+        altCheckBox.CheckedChanged += UpdatePreview;
+        shiftCheckBox.CheckedChanged += UpdatePreview;
+        keyCombo.SelectedIndexChanged += UpdatePreview;
+
+        var applyButton = new Button
+        {
+            Text = "Apply",
+            Left = 112,
+            Top = 150,
+            Width = 75,
+            DialogResult = DialogResult.OK
+        };
+
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            Left = 193,
+            Top = 150,
+            Width = 75,
+            DialogResult = DialogResult.Cancel
+        };
+
+        dialog.Controls.Add(instructionLabel);
+        dialog.Controls.Add(currentLabel);
+        dialog.Controls.Add(ctrlCheckBox);
+        dialog.Controls.Add(altCheckBox);
+        dialog.Controls.Add(shiftCheckBox);
+        dialog.Controls.Add(keyLabel);
+        dialog.Controls.Add(keyCombo);
+        dialog.Controls.Add(previewLabel);
+        dialog.Controls.Add(applyButton);
+        dialog.Controls.Add(cancelButton);
+        dialog.AcceptButton = applyButton;
+        dialog.CancelButton = cancelButton;
+
+        UpdatePreview(null, EventArgs.Empty);
+
+        if (dialog.ShowDialog() != DialogResult.OK)
+        {
+            return null;
+        }
+
+        var modifiers = ModifierKeys.None;
+        if (ctrlCheckBox.Checked) modifiers |= ModifierKeys.Control;
+        if (altCheckBox.Checked) modifiers |= ModifierKeys.Alt;
+        if (shiftCheckBox.Checked) modifiers |= ModifierKeys.Shift;
+
+        if (modifiers == 0)
+        {
+            return null;
+        }
+
+        if (keyCombo.SelectedIndex < 0)
+        {
+            return null;
+        }
+
+        var selectedKey = commonKeys[keyCombo.SelectedIndex];
+        return (modifiers, selectedKey);
+    }
+
+    // -----------------------------------------------------------------------
+    // Start with Windows
+    // -----------------------------------------------------------------------
+
     private void ToggleStartWithWindows()
     {
         bool previousState;
@@ -443,6 +741,10 @@ internal sealed class TrayApp : IDisposable
     {
         Application.Exit();
     }
+
+    // -----------------------------------------------------------------------
+    // Rate configuration
+    // -----------------------------------------------------------------------
 
     private void ConfigureRateA()
     {
@@ -623,6 +925,10 @@ internal sealed class TrayApp : IDisposable
 
         return -1;
     }
+
+    // -----------------------------------------------------------------------
+    // Uninstall
+    // -----------------------------------------------------------------------
 
     private void Uninstall()
     {
