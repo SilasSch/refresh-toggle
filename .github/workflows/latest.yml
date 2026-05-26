@@ -31,7 +31,7 @@ jobs:
           dotnet-version: '8.x'
 
       - name: Publish
-        run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o ./publish
+        run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish
 
       - name: Rename exe
         run: Rename-Item ./publish/RefreshToggle.exe ${{ matrix.exe }}
