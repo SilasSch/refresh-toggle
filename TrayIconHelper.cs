@@ -45,7 +45,13 @@ internal static class TrayIconHelper
             bg = ColorUnknown;
         }
 
-        return BuildIcon(refreshRate.ToString(), bg);
+        // Truncate to last 2 digits for better readability at 16px
+        // e.g. "120" → "20", "144" → "44", "60" → "60"
+        var label = refreshRate >= 100
+            ? (refreshRate % 100).ToString()
+            : refreshRate.ToString();
+
+        return BuildIcon(label, bg);
     }
 
     /// <summary>
@@ -74,9 +80,9 @@ internal static class TrayIconHelper
         using var path = RoundedRect(new Rectangle(0, 0, size, size), radius);
         g.FillPath(bgBrush, path);
 
-        // White label – font size scales with icon size; shrink further for 3-digit numbers
-        float fontSize = label.Length >= 3 ? size * 5.5f / 16f : size * 7f / 16f;
-        using var font = new Font(FontFamily.GenericSansSerif, fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
+        // White label – font size scales with icon size
+        float fontSize = size * 7.5f / 16f;
+        using var font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
         using var textBrush = new SolidBrush(Color.White);
 
         using var stringFormat = new StringFormat
