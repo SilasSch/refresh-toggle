@@ -26,7 +26,11 @@ internal sealed class TrayApp : IDisposable
 
     public TrayApp(bool showInstallNotification, string? installError, string? startupMigrationError)
     {
-        _config = AppConfig.Load();
+        var loadResult = AppConfig.LoadWithResult();
+        _config = loadResult.Config;
+        string? configResetWarning = loadResult.WasReset
+            ? $"Config was reset to defaults: {loadResult.ResetReason}"
+            : null;
 
         var startupEnabled = false;
         var startupStateAvailable = true;
@@ -137,6 +141,11 @@ internal sealed class TrayApp : IDisposable
         if (!string.IsNullOrWhiteSpace(startupMigrationError))
         {
             ShowError(startupMigrationError);
+        }
+
+        if (configResetWarning is not null)
+        {
+            ShowWarning(configResetWarning);
         }
     }
 
@@ -263,6 +272,14 @@ internal sealed class TrayApp : IDisposable
         _notifyIcon.BalloonTipTitle = "RefreshToggle";
         _notifyIcon.BalloonTipText = message;
         _notifyIcon.BalloonTipIcon = ToolTipIcon.Info;
+        _notifyIcon.ShowBalloonTip(4000);
+    }
+
+    private void ShowWarning(string message)
+    {
+        _notifyIcon.BalloonTipTitle = "RefreshToggle";
+        _notifyIcon.BalloonTipText = message;
+        _notifyIcon.BalloonTipIcon = ToolTipIcon.Warning;
         _notifyIcon.ShowBalloonTip(4000);
     }
 
