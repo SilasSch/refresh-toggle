@@ -50,6 +50,8 @@ internal sealed class AppConfig
     {
         Directory.CreateDirectory(ConfigDirectory);
         var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(ConfigPath, json);
+        var tempPath = ConfigPath + ".tmp";
+        File.WriteAllText(tempPath, json);
+        File.Move(tempPath, ConfigPath, overwrite: true);
     }
 }
