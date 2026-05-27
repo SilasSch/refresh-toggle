@@ -23,6 +23,8 @@ internal sealed class TrayApp : IDisposable
     private ToolStripMenuItem? _noDisplaysItem;
     private Icon? _currentIcon;
     private volatile bool _disposed;
+    private DateTime _lastDisplaySettingsChange = DateTime.MinValue;
+    private static readonly TimeSpan DisplaySettingsDebounce = TimeSpan.FromSeconds(1);
 
     public TrayApp(bool showInstallNotification, string? installError, string? startupMigrationError)
     {
@@ -372,6 +374,13 @@ internal sealed class TrayApp : IDisposable
         {
             return;
         }
+
+        var now = DateTime.UtcNow;
+        if (now - _lastDisplaySettingsChange < DisplaySettingsDebounce)
+        {
+            return;
+        }
+        _lastDisplaySettingsChange = now;
 
         if (_menu.InvokeRequired)
         {
