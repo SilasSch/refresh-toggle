@@ -32,6 +32,29 @@ internal sealed class TrayApp : IDisposable
             ? $"Config was reset to defaults: {loadResult.ResetReason}"
             : null;
 
+        var startupState = SyncStartupState();
+
+        InitializeMenuItems(startupState.Enabled, startupState.Available);
+
+        _currentIcon = TrayIconHelper.CreateUnknown();
+        _notifyIcon = new NotifyIcon
+        {
+            Icon = _currentIcon,
+            Visible = true,
+            ContextMenuStrip = _menu
+        };
+
+        _notifyIcon.MouseClick += NotifyIconOnMouseClick;
+        _notifyIcon.DoubleClick += (_, _) => ToggleRefreshRate();
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+
+        RefreshDisplayState();
+
+        ShowDeferredNotifications(startupState.DeferredError, showInstallNotification, installError, startupMigrationError);
+    }
+
+    private (bool Enabled, bool Available, string? DeferredError) SyncStartupState()
+    {
         var startupEnabled = false;
         var startupStateAvailable = true;
         string? deferredError = null;
@@ -76,6 +99,11 @@ internal sealed class TrayApp : IDisposable
             }
         }
 
+        return (startupEnabled, startupStateAvailable, deferredError);
+    }
+
+    private void InitializeMenuItems(bool startupEnabled, bool startupStateAvailable)
+    {
         _statusItem = new ToolStripMenuItem("Current: Unknown") { Enabled = false };
         _displaySectionStartSeparator = new ToolStripSeparator();
         _displaySectionEndSeparator = new ToolStripSeparator();
@@ -108,24 +136,13 @@ internal sealed class TrayApp : IDisposable
         _menu.Items.Add(_uninstallItem);
         _menu.Items.Add(_exitItem);
         _menu.Opening += (_, _) => RefreshDisplayState();
+    }
 
-        _currentIcon = TrayIconHelper.CreateUnknown();
-        _notifyIcon = new NotifyIcon
+    private void ShowDeferredNotifications(string? startupError, bool showInstallNotification, string? installError, string? startupMigrationError)
+    {
+        if (startupError is not null)
         {
-            Icon = _currentIcon,
-            Visible = true,
-            ContextMenuStrip = _menu
-        };
-
-        _notifyIcon.MouseClick += NotifyIconOnMouseClick;
-        _notifyIcon.DoubleClick += (_, _) => ToggleRefreshRate();
-        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
-
-        RefreshDisplayState();
-
-        if (deferredError is not null)
-        {
-            ShowError(deferredError);
+            ShowError(startupError);
         }
 
         if (showInstallNotification)
