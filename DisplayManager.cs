@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -55,10 +56,12 @@ internal sealed class DisplayManager
         {
             refreshRate = 0;
             error = $"EnumDisplaySettings failed: {new Win32Exception(Marshal.GetLastWin32Error()).Message}";
+            Debug.WriteLine($"[DisplayManager] TryGetCurrentRefreshRate({deviceName ?? "default"}) failed: {error}");
             return false;
         }
 
         refreshRate = mode.dmDisplayFrequency;
+        Debug.WriteLine($"[DisplayManager] TryGetCurrentRefreshRate({deviceName ?? "default"}) = {refreshRate} Hz");
         error = null;
         return true;
     }
@@ -71,6 +74,7 @@ internal sealed class DisplayManager
         if (refreshRate <= 0)
         {
             error = "Refresh rate must be greater than 0.";
+            Debug.WriteLine($"[DisplayManager] TrySetRefreshRate({deviceName ?? "default"}, {refreshRate}) failed: {error}");
             return false;
         }
 
@@ -78,6 +82,7 @@ internal sealed class DisplayManager
         if (!EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref mode))
         {
             error = $"EnumDisplaySettings failed: {new Win32Exception(Marshal.GetLastWin32Error()).Message}";
+            Debug.WriteLine($"[DisplayManager] TrySetRefreshRate({deviceName ?? "default"}, {refreshRate}) failed: {error}");
             return false;
         }
 
@@ -88,9 +93,11 @@ internal sealed class DisplayManager
         if (result != DISP_CHANGE_SUCCESSFUL)
         {
             error = $"ChangeDisplaySettingsEx failed with code {result}.";
+            Debug.WriteLine($"[DisplayManager] TrySetRefreshRate({deviceName ?? "default"}, {refreshRate}) failed: {error}");
             return false;
         }
 
+        Debug.WriteLine($"[DisplayManager] TrySetRefreshRate({deviceName ?? "default"}, {refreshRate}) succeeded");
         error = null;
         return true;
     }
@@ -135,6 +142,7 @@ internal sealed class DisplayManager
         }
 
         rates = distinctRates.OrderBy(rate => rate).ToArray();
+        Debug.WriteLine($"[DisplayManager] TryGetSupportedRefreshRates({deviceName ?? "default"}) found {rates.Count} rates: [{string.Join(", ", rates)}]");
         error = string.Empty;
         return true;
     }
