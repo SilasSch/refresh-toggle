@@ -13,12 +13,11 @@
     <PublishSingleFile>true</PublishSingleFile>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
-    <!-- WinForms uses reflection for event wiring; exclude from trimming if needed -->
-    <TrimmerRootAssembly Include="System.Windows.Forms" />
-    <TrimmerRootAssembly Include="System.Drawing" />
   </PropertyGroup>
 
   <ItemGroup>
+    <TrimmerRootAssembly Include="System.Windows.Forms" />
+    <TrimmerRootAssembly Include="System.Drawing" />
     <EmbeddedResource Include="icon.ico" LogicalName="RefreshToggle.icon.ico" />
   </ItemGroup>
 
