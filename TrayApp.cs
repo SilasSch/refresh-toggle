@@ -8,17 +8,17 @@ internal sealed class TrayApp : IDisposable
 {
     private readonly DisplayManager _displayManager = new();
     private readonly NotifyIcon _notifyIcon;
-    private readonly ContextMenuStrip _menu;
-    private readonly ToolStripMenuItem _statusItem;
-    private readonly ToolStripSeparator _displaySectionStartSeparator;
-    private readonly ToolStripSeparator _displaySectionEndSeparator;
+    private ContextMenuStrip _menu;
+    private ToolStripMenuItem _statusItem;
+    private ToolStripSeparator _displaySectionStartSeparator;
+    private ToolStripSeparator _displaySectionEndSeparator;
     private readonly List<(DisplayInfo Display, ToolStripMenuItem Item)> _displayToggleItems = [];
-    private readonly ToolStripMenuItem _setRateAItem;
-    private readonly ToolStripMenuItem _setRateBItem;
-    private readonly ToolStripMenuItem _hotkeyMenuItem;
-    private readonly ToolStripMenuItem _startWithWindowsItem;
-    private readonly ToolStripMenuItem _uninstallItem;
-    private readonly ToolStripMenuItem _exitItem;
+    private ToolStripMenuItem _setRateAItem;
+    private ToolStripMenuItem _setRateBItem;
+    private ToolStripMenuItem _hotkeyMenuItem;
+    private ToolStripMenuItem _startWithWindowsItem;
+    private ToolStripMenuItem _uninstallItem;
+    private ToolStripMenuItem _exitItem;
     private readonly AppConfig _config;
     private readonly HotkeyManager _hotkeyManager;
     private IReadOnlyList<DisplayInfo> _displays = [];
