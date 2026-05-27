@@ -12,12 +12,9 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
 
   <ItemGroup>
-    <TrimmerRootAssembly Include="System.Windows.Forms" />
-    <TrimmerRootAssembly Include="System.Drawing" />
     <EmbeddedResource Include="icon.ico" LogicalName="RefreshToggle.icon.ico" />
   </ItemGroup>
 
