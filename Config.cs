@@ -15,13 +15,18 @@ internal sealed class AppConfig
 
     public static AppConfig Load()
     {
+        return LoadWithResult().Config;
+    }
+
+    public static LoadResult LoadWithResult()
+    {
         Directory.CreateDirectory(ConfigDirectory);
 
         if (!File.Exists(ConfigPath))
         {
             var defaultConfig = new AppConfig();
             defaultConfig.Save();
-            return defaultConfig;
+            return new LoadResult(defaultConfig, WasReset: false, ResetReason: null);
         }
 
         try
@@ -33,17 +38,17 @@ internal sealed class AppConfig
             {
                 var fallback = new AppConfig();
                 fallback.Save();
-                return fallback;
+                return new LoadResult(fallback, WasReset: true, ResetReason: "Config contained invalid values (rates <= 0 or equal).");
             }
 
-            return config;
+            return new LoadResult(config, WasReset: false, ResetReason: null);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             System.Diagnostics.Debug.WriteLine($"Config load failed: {ex.Message}");
             var fallback = new AppConfig();
             fallback.Save();
-            return fallback;
+            return new LoadResult(fallback, WasReset: true, ResetReason: $"Config file could not be read: {ex.Message}");
         }
     }
 
@@ -56,3 +61,5 @@ internal sealed class AppConfig
         File.Move(tempPath, ConfigPath, overwrite: true);
     }
 }
+
+internal sealed record LoadResult(AppConfig Config, bool WasReset, string? ResetReason);
