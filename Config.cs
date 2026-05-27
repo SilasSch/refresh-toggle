@@ -38,8 +38,9 @@ internal sealed class AppConfig
 
             return config;
         }
-        catch
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
+            System.Diagnostics.Debug.WriteLine($"Config load failed: {ex.Message}");
             var fallback = new AppConfig();
             fallback.Save();
             return fallback;
