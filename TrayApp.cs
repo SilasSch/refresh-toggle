@@ -59,6 +59,11 @@ internal sealed class TrayApp : IDisposable
         RefreshDisplayState();
 
         ShowDeferredNotifications(startupState.DeferredError, showInstallNotification, installError, startupMigrationError);
+
+        if (configResetWarning is not null)
+        {
+            ShowWarning(configResetWarning);
+        }
     }
 
     private (bool Enabled, bool Available, string? DeferredError) SyncStartupState()
@@ -154,6 +159,7 @@ internal sealed class TrayApp : IDisposable
         if (startupError is not null)
         {
             ShowError(startupError);
+        }
 
         if (showInstallNotification)
         {
@@ -168,11 +174,6 @@ internal sealed class TrayApp : IDisposable
         if (!string.IsNullOrWhiteSpace(startupMigrationError))
         {
             ShowError(startupMigrationError);
-        }
-
-        if (configResetWarning is not null)
-        {
-            ShowWarning(configResetWarning);
         }
     }
 
