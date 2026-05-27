@@ -162,6 +162,10 @@ internal sealed class DisplayManager
         uint dwflags,
         IntPtr lParam);
 
+    // Note: Optional printer fields (dmOrientation, dmPaperSize, dmPaperLength,
+    // dmPaperWidth, dmScale, dmCopies, dmDefaultSource, dmPrintQuality) are omitted
+    // between dmFields and dmPosition because this struct is only used for display
+    // settings, not printing. Windows reads dmSize and correctly skips the missing fields.
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct DEVMODE
     {
