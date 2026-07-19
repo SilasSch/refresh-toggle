@@ -1,87 +1,81 @@
 # RefreshToggle
 
-**Lightweight Windows system tray utility to toggle display refresh rates between two configured values.**
-
-Download the latest release and run — no .NET installation required.
-
-## Features
-
-- **One-click toggle** — left-click the tray icon to switch refresh rates instantly
-- **Dynamic tray icon** — shows your current Hz with color coding (green = high, gray = low)
-- **Multi-monitor support** — per-display toggle entries in the context menu
-- **Auto-start** — optional "Start with Windows" via context menu
-- **Self-installing** — copies itself to `%LOCALAPPDATA%\RefreshToggle\` for clean auto-start
-- **Portable** — single self-contained `.exe`, no runtime needed
-- **ARM64 compatible** — .NET 8, runs on Snapdragon / ARM laptops
+RefreshToggle is a small Windows tray application that switches all active displays between two configured refresh-rate profiles. It validates the complete multi-monitor change before applying anything, so unsupported targets never leave displays in a partially changed state.
 
 ## Download
 
-Grab the latest release from [GitHub Releases](../../releases):
+Download the matching executable from [GitHub Releases](../../releases):
 
-| File | Platform |
-|------|----------|
-| `RefreshToggle-x64.exe` | 64-bit PCs (Intel / AMD) |
-| `RefreshToggle-arm64.exe` | ARM64 (Snapdragon laptops) |
+| Asset | Windows device |
+| --- | --- |
+| `RefreshToggle-win-x64.exe` | Intel and AMD 64-bit PCs |
+| `RefreshToggle-win-arm64.exe` | ARM64 PCs, including Snapdragon devices |
 
-Just run the `.exe` — it's fully self-contained.
+Official releases are self-contained .NET 10 single-file applications. No separate .NET runtime is required. They are not Authenticode-signed, so Windows may show a SmartScreen warning. Verify the checksum and GitHub attestation before running a downloaded binary.
+
+```powershell
+Get-FileHash .\RefreshToggle-win-x64.exe -Algorithm SHA256
+gh attestation verify .\RefreshToggle-win-x64.exe --repo SilasSch/refresh-toggle
+```
+
+Compare the first result with `SHA256SUMS.txt` attached to the same release.
+
+## Behavior
+
+- Left-clicking the tray icon or pressing the configured global hotkey toggles all active displays.
+- Rate A and Rate B are global profiles. Before every toggle, RefreshToggle enumerates displays again and enables a target only if every active display supports it.
+- Every mode is preflight-tested, then applied, read back, and verified. If one display fails, already changed displays are restored best-effort.
+- The tray icon renders the full current rate, including three-digit values such as 100, 105, and 200 Hz. An embedded static icon is used if dynamic rendering fails.
+- Display-change events use a trailing 500 ms debounce, so event storms settle before one final refresh.
+
+The rate picker shows the union of detected refresh rates and labels each option as supported by N of M displays. A rate that is not supported by all active displays can be saved as a profile but cannot be toggled until the display set supports it.
 
 ## Configuration
 
-On first launch, a config file is created at `%APPDATA%\RefreshToggle\config.json`:
+Configuration is stored at `%APPDATA%\RefreshToggle\config.json`:
 
 ```json
 {
+  "SchemaVersion": 1,
   "RateA": 60,
   "RateB": 120,
-  "StartWithWindows": false
+  "HotkeyModifiers": "Ctrl+Alt",
+  "HotkeyKey": "T"
 }
 ```
 
-You can configure `RateA` and `RateB` directly from the tray menu using **Set Rate A...** / **Set Rate B...**.
-The app lists supported rates for your primary display and saves changes to `config.json` automatically.
+Unversioned configuration files are migrated automatically. The legacy `StartWithWindows` field is ignored and removed on the next successful save; the current-user Registry Run entry is the only startup source of truth. Damaged JSON is preserved best-effort as `config.corrupt-<UTC>.json`, after which safe defaults are used.
 
-> `StartWithWindows` is managed automatically by the tray menu — no need to edit it manually.
+## Installation and uninstall
 
-## Tray Menu
+Only official distribution binaries may install themselves into `%LOCALAPPDATA%\RefreshToggle` or change startup registration. Debug builds, framework-dependent builds, and ordinary source publishes run in portable development mode; their Startup and Uninstall actions are disabled with an explanation.
 
-| Action | Description |
-|--------|-------------|
-| **Left-click icon** | Toggle refresh rate |
-| **Per-display entries** | Toggle rate for a specific monitor |
-| **Set Rate A... / Set Rate B...** | Pick configured target rates from supported display modes |
-| **Start with Windows** | Register / unregister auto-start |
-| **Uninstall** | Remove installed copy and startup entry |
-| **Exit** | Close the app |
+Official builds install through a verified temporary copy and atomic replacement. Uninstall hands cleanup to nonce-bound temporary helper processes, removes the installed executable and startup entry, and keeps `%APPDATA%\RefreshToggle\config.json` deliberately. A locked executable is retried and can be scheduled for deletion at the next reboot.
 
-## Build from Source
+## Build from source
 
-```bash
-# Restore & build
-dotnet build
+The repository pins SDK `10.0.302` in `global.json`.
 
-# Run
-dotnet run
-
-# Publish portable single-file
-dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./publish/win-x64
-dotnet publish -c Release -r win-arm64 --self-contained -p:PublishSingleFile=true -o ./publish/win-arm64
+```powershell
+dotnet restore RefreshToggle.sln --locked-mode
+dotnet build RefreshToggle.sln -c Release --no-restore
+dotnet test tests/RefreshToggle.Tests/RefreshToggle.Tests.csproj -c Release --no-build --no-restore
 ```
 
-Releases are built automatically via GitHub Actions on every `v*` tag push.
+A normal source publish remains portable by design. To reproduce the release layout for inspection:
 
-## Changelog
+```powershell
+dotnet publish src/RefreshToggle.App/RefreshToggle.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DistributionBuild=true -o artifacts/win-x64
+```
 
-### v0.3.0
-- Multi-monitor support — per-display refresh rate toggle in tray menu (#14)
-- Auto-install to `%LOCALAPPDATA%` — install/uninstall from tray (#13)
+`DistributionBuild=true` is intended for the pinned GitHub workflow. The runtime additionally verifies that the process is an actual self-contained single-file Windows bundle with a matching RID before permitting installation changes.
 
-### v0.2.0
-- Dynamic tray icon with Hz display and color coding (#9)
-- Portable single-file `.exe` releases for x64 and ARM64 (#10)
+## Quality and release process
 
-### v0.1.0
-- Initial release — single-display toggle, config file, system tray
+Pull requests and `master` run locked restore with NuGet audit, formatting verification, warnings-as-errors Release builds, 80% minimum line coverage for Core and Application, tests, both Windows publishes, PE architecture checks, and the x64 read-only `--health-check`. Release assets include SHA-256 checksums and GitHub Artifact Attestations.
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
-MIT
+[MIT](LICENSE)

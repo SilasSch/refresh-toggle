@@ -1,5 +1,11 @@
 bin/
 obj/
 publish/
+artifacts/
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
 *.user
 .vs/
