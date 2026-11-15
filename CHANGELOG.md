@@ -6,6 +6,12 @@ All notable changes to RefreshToggle are documented here.
 
 Rewrite for simplicity: one project, ~1,000 lines instead of ~5,800.
 
+### Added
+
+- Automatic refresh rate by power source on laptops: higher rate when plugged in, lower on
+  battery, applied on plug/unplug, at start and after sleep. Manual toggles stay until the next
+  plug/unplug. `AutoByPowerSource` in `config.json`, on by default, menu checkbox to turn it off.
+
 ### Changed
 
 - Monitors that don't support the target rate are skipped instead of blocking the whole toggle.

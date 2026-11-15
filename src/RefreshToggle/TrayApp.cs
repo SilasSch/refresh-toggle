@@ -12,6 +12,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly ContextMenuStrip _menu = new();
     private readonly Font _boldFont;
     private readonly GlobalHotkey _hotkey = new();
+    private readonly PowerSourceTracker _power = new();
     private readonly System.Windows.Forms.Timer _displayChangeDebounce = new() { Interval = 500 };
     private Config _config;
     private List<Display> _displays = [];
@@ -46,6 +47,7 @@ internal sealed class TrayApp : ApplicationContext
             RefreshDisplays();
         };
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
         RefreshDisplays();
         if (configWarning is not null)
@@ -58,9 +60,27 @@ internal sealed class TrayApp : ApplicationContext
         {
             Notify($"Hotkey {hotkey} is already used by another app. Pick another one from the menu.", ToolTipIcon.Warning);
         }
+
+        CheckPowerSource();
     }
 
     private void Toggle()
+    {
+        RefreshDisplays();
+        if (_displays.Count == 0)
+        {
+            Notify("No active displays found.", ToolTipIcon.Error);
+            return;
+        }
+
+        SwitchTo(RateLogic.NextRate(_displays[0].CurrentRate, _config.RateA, _config.RateB), prefix: "");
+    }
+
+    /// <summary>
+    /// Switches every display that isn't at <paramref name="target"/> yet and supports it.
+    /// Silent when nothing needs to change; <paramref name="prefix"/> marks automatic switches.
+    /// </summary>
+    private void SwitchTo(int target, string prefix)
     {
         if (_busy)
         {
@@ -71,17 +91,16 @@ internal sealed class TrayApp : ApplicationContext
         try
         {
             RefreshDisplays();
-            if (_displays.Count == 0)
+            var pending = _displays.Where(display => display.CurrentRate != target).ToList();
+            if (pending.Count == 0)
             {
-                Notify("No active displays found.", ToolTipIcon.Error);
                 return;
             }
 
             var fromRate = _displays[0].CurrentRate;
-            var target = RateLogic.NextRate(fromRate, _config.RateA, _config.RateB);
             var unsupported = new List<string>();
             var failed = new List<string>();
-            foreach (var display in _displays.Where(display => display.CurrentRate != target))
+            foreach (var display in pending)
             {
                 if (!display.SupportedRates.Contains(target))
                 {
@@ -96,21 +115,61 @@ internal sealed class TrayApp : ApplicationContext
             RefreshDisplays();
             if (failed.Count > 0)
             {
-                Notify($"Could not switch to {target} Hz: {string.Join(", ", failed)}", ToolTipIcon.Error);
+                Notify($"{prefix}Could not switch to {target} Hz: {string.Join(", ", failed)}", ToolTipIcon.Error);
             }
-            else if (unsupported.Count == _displays.Count)
+            else if (unsupported.Count == pending.Count)
             {
-                Notify($"{target} Hz is not supported by any display.", ToolTipIcon.Warning);
+                Notify($"{prefix}{target} Hz is not supported by: {string.Join(", ", unsupported)}", ToolTipIcon.Warning);
             }
             else
             {
                 var note = unsupported.Count > 0 ? $"\nSkipped (no {target} Hz): {string.Join(", ", unsupported)}" : "";
-                Notify($"{fromRate} → {target} Hz{note}", ToolTipIcon.Info);
+                Notify($"{prefix}{fromRate} → {target} Hz{note}", ToolTipIcon.Info);
             }
         }
         finally
         {
             _busy = false;
+        }
+    }
+
+    private static bool HasBattery =>
+        !SystemInformation.PowerStatus.BatteryChargeStatus.HasFlag(BatteryChargeStatus.NoSystemBattery);
+
+    private static bool? ReadPluggedIn() => SystemInformation.PowerStatus.PowerLineStatus switch
+    {
+        PowerLineStatus.Online => true,
+        PowerLineStatus.Offline => false,
+        _ => null,
+    };
+
+    private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
+    {
+        // Resume covers "unplugged while asleep"; the tracker filters battery-percentage ticks.
+        if (e.Mode is PowerModes.StatusChange or PowerModes.Resume)
+        {
+            CheckPowerSource();
+        }
+    }
+
+    /// <summary>Applies the power rule only on a real plugged-in / on-battery transition (or the first reading).</summary>
+    private void CheckPowerSource()
+    {
+        if (_power.Observe(ReadPluggedIn()) is bool pluggedIn && _config.AutoByPowerSource && HasBattery)
+        {
+            ApplyPowerRule(pluggedIn);
+        }
+    }
+
+    private void ApplyPowerRule(bool pluggedIn) =>
+        SwitchTo(RateLogic.RateForPowerSource(pluggedIn, _config.RateA, _config.RateB), pluggedIn ? "🔌 " : "🔋 ");
+
+    private void SetAutoByPowerSource(bool enabled)
+    {
+        SaveConfig(_config with { AutoByPowerSource = enabled });
+        if (enabled && ReadPluggedIn() is bool pluggedIn)
+        {
+            ApplyPowerRule(pluggedIn);
         }
     }
 
@@ -170,6 +229,15 @@ internal sealed class TrayApp : ApplicationContext
         var startup = new ToolStripMenuItem("Start with Windows") { Checked = SafeIsStartupEnabled() };
         startup.Click += (_, _) => SetStartup(!startup.Checked);
         _menu.Items.Add(startup);
+
+        if (HasBattery)
+        {
+            var high = Math.Max(_config.RateA, _config.RateB);
+            var low = Math.Min(_config.RateA, _config.RateB);
+            var auto = new ToolStripMenuItem($"Auto: {high} Hz plugged in, {low} Hz on battery") { Checked = _config.AutoByPowerSource };
+            auto.Click += (_, _) => SetAutoByPowerSource(!auto.Checked);
+            _menu.Items.Add(auto);
+        }
 
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitThread()));
@@ -279,6 +347,7 @@ internal sealed class TrayApp : ApplicationContext
         if (disposing)
         {
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
             _displayChangeDebounce.Dispose();
             _hotkey.Dispose();
             _tray.Visible = false;

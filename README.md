@@ -9,8 +9,12 @@ with one click or a global hotkey.
 - The icon shows the current rate: **blue** = Rate A, **green** = Rate B, grey = anything else.
 - After each toggle a notification shows the change, e.g. `60 → 120 Hz`. Monitors that don't
   support the target rate are skipped and named in the notification.
+- **Auto by power source** (laptops, on by default): plugging in switches to the higher of
+  Rate A/B, unplugging to the lower one (`🔌 60 → 120 Hz` / `🔋 120 → 60 Hz`). It also applies at
+  start and after waking from sleep. A manual toggle stays until you plug in or unplug again, so
+  120 Hz on battery is still one click away. Turn it off in the menu.
 - **Right-click** for the menu: current rate per monitor, Rate A / Rate B (only rates every
-  monitor supports are listed), hotkey, *Start with Windows*, Exit.
+  monitor supports are listed), hotkey, *Start with Windows*, *Auto*, Exit.
 
 ## Download
 
@@ -28,6 +32,7 @@ Stored in `%APPDATA%\RefreshToggle\config.json` (same format as v0.4.0):
   "RateB": 120,
   "HotkeyModifiers": "Ctrl+Shift",
   "HotkeyKey": "R",
+  "AutoByPowerSource": true,
   "SchemaVersion": 1
 }
 ```
