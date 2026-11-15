@@ -18,6 +18,7 @@ internal sealed class TrayApp : ApplicationContext
     private List<Display> _displays = [];
     private string? _iconKey;
     private bool _busy;
+    private bool _powerRuleOwed; // a real power transition happened but could not be applied yet
 
     public TrayApp()
     {
@@ -45,11 +46,16 @@ internal sealed class TrayApp : ApplicationContext
         {
             _displayChangeDebounce.Stop();
             RefreshDisplays();
+            if (_powerRuleOwed && _config.AutoByPowerSource && ReadPluggedIn() is bool pluggedIn)
+            {
+                ApplyPowerRule(pluggedIn); // e.g. displays were not back yet right after resume
+            }
         };
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
         RefreshDisplays();
+        CheckPowerSource(); // before the warnings below, so their balloons aren't replaced by "🔌 60 → 120 Hz"
         if (configWarning is not null)
         {
             Notify(configWarning, ToolTipIcon.Warning);
@@ -60,12 +66,11 @@ internal sealed class TrayApp : ApplicationContext
         {
             Notify($"Hotkey {hotkey} is already used by another app. Pick another one from the menu.", ToolTipIcon.Warning);
         }
-
-        CheckPowerSource();
     }
 
     private void Toggle()
     {
+        _powerRuleOwed = false; // a manual choice wins over a pending automatic one
         RefreshDisplays();
         if (_displays.Count == 0)
         {
@@ -79,25 +84,31 @@ internal sealed class TrayApp : ApplicationContext
     /// <summary>
     /// Switches every display that isn't at <paramref name="target"/> yet and supports it.
     /// Silent when nothing needs to change; <paramref name="prefix"/> marks automatic switches.
+    /// Returns false when it could not run (busy, or no displays yet) so the caller can retry.
     /// </summary>
-    private void SwitchTo(int target, string prefix)
+    private bool SwitchTo(int target, string prefix)
     {
         if (_busy)
         {
-            return;
+            return false;
         }
 
         _busy = true;
         try
         {
             RefreshDisplays();
+            if (_displays.Count == 0)
+            {
+                return false;
+            }
+
             var pending = _displays.Where(display => display.CurrentRate != target).ToList();
             if (pending.Count == 0)
             {
-                return;
+                return true;
             }
 
-            var fromRate = _displays[0].CurrentRate;
+            var fromRate = pending[0].CurrentRate; // primary first, unless it is already at target
             var unsupported = new List<string>();
             var failed = new List<string>();
             foreach (var display in pending)
@@ -126,6 +137,8 @@ internal sealed class TrayApp : ApplicationContext
                 var note = unsupported.Count > 0 ? $"\nSkipped (no {target} Hz): {string.Join(", ", unsupported)}" : "";
                 Notify($"{prefix}{fromRate} → {target} Hz{note}", ToolTipIcon.Info);
             }
+
+            return true;
         }
         finally
         {
@@ -162,15 +175,19 @@ internal sealed class TrayApp : ApplicationContext
     }
 
     private void ApplyPowerRule(bool pluggedIn) =>
-        SwitchTo(RateLogic.RateForPowerSource(pluggedIn, _config.RateA, _config.RateB), pluggedIn ? "🔌 " : "🔋 ");
+        _powerRuleOwed = !SwitchTo(
+            RateLogic.RateForPowerSource(pluggedIn, _config.RateA, _config.RateB),
+            pluggedIn ? "🔌 " : "🔋 ");
 
     private void SetAutoByPowerSource(bool enabled)
     {
-        SaveConfig(_config with { AutoByPowerSource = enabled });
+        var updated = _config with { AutoByPowerSource = enabled };
         if (enabled && ReadPluggedIn() is bool pluggedIn)
         {
             ApplyPowerRule(pluggedIn);
         }
+
+        SaveConfig(updated); // last, so a save error isn't hidden behind the switch balloon
     }
 
     private void RefreshDisplays()
