@@ -2,6 +2,27 @@
 
 All notable changes to RefreshToggle are documented here.
 
+## [0.5.0] - 2026-11-15
+
+Rewrite for simplicity: one project, ~1,000 lines instead of ~5,800.
+
+### Changed
+
+- Monitors that don't support the target rate are skipped instead of blocking the whole toggle.
+- Rate A / Rate B are picked from submenus instead of a dialog; the hotkey dialog captures the
+  combination you press.
+- The exe runs from wherever you put it; *Start with Windows* points at that exe.
+- Every error is shown, also when the same error repeats (v0.4.0 showed it only once).
+- A notification shows `old → new Hz` after every toggle.
+
+### Removed
+
+- Self-install to `%LOCALAPPDATA%` and uninstall (including cleanup/reaper helper processes).
+- Transactional preflight, read-back verification and rollback. This also avoids false rollbacks
+  on monitors where Windows reports 59 Hz after switching to 60 Hz.
+- `--health-check`, artifact attestations, SHA256SUMS, coverage gate, lock files and the rolling
+  `latest` prerelease.
+
 ## [0.4.0] - 2026-07-19
 
 ### Added
