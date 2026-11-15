@@ -19,7 +19,7 @@ public sealed class ConfigTests : IDisposable
     [Fact]
     public void Save_then_load_round_trips()
     {
-        var saved = new Config(RateA: 75, RateB: 165, HotkeyModifiers: "Alt", HotkeyKey: "F9");
+        var saved = new Config(RateA: 75, RateB: 165, HotkeyModifiers: "Alt", HotkeyKey: "F9", AutoByPowerSource: false);
         saved.Save(ConfigPath);
 
         var (loaded, warning) = Config.Load(ConfigPath);
@@ -45,6 +45,7 @@ public sealed class ConfigTests : IDisposable
         var (config, warning) = Config.Load(ConfigPath);
         Assert.Equal(new Config(60, 144, "Ctrl+Alt", "T"), config);
         Assert.Null(warning);
+        Assert.True(config.AutoByPowerSource); // field did not exist in v0.4.0
     }
 
     [Fact]

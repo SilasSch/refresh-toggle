@@ -11,7 +11,8 @@ internal sealed record Config(
     int RateA = 60,
     int RateB = 120,
     string HotkeyModifiers = "Ctrl+Shift",
-    string HotkeyKey = "R")
+    string HotkeyKey = "R",
+    bool AutoByPowerSource = true)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
