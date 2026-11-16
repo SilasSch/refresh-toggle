@@ -1,60 +1,41 @@
-using RefreshToggle.Core;
-
 namespace RefreshToggle.Tests;
 
-public sealed class HotkeyBindingTests
+public class HotkeyBindingTests
 {
     [Theory]
-    [InlineData("Ctrl+Shift", "R", (uint)(HotkeyModifiers.Control | HotkeyModifiers.Shift), (uint)HotkeyKey.R, "Ctrl+Shift+R")]
-    [InlineData("control+alt", "Esc", (uint)(HotkeyModifiers.Control | HotkeyModifiers.Alt), (uint)HotkeyKey.Escape, "Ctrl+Alt+Escape")]
-    [InlineData("Windows", "PgDn", (uint)HotkeyModifiers.Windows, (uint)HotkeyKey.PageDown, "Win+PageDown")]
-    [InlineData("Alt", "1", (uint)HotkeyModifiers.Alt, (uint)HotkeyKey.D1, "Alt+1")]
-    public void ParseAcceptsNamedKeysAndAliases(
-        string modifiers,
-        string key,
-        uint expectedModifiers,
-        uint expectedKey,
-        string expectedText)
+    [InlineData("Ctrl+Shift", "R", "Ctrl+Shift+R")]
+    [InlineData("shift + control", "r", "Ctrl+Shift+R")]
+    [InlineData("Alt", "F12", "Alt+F12")]
+    [InlineData("Win+Alt", "5", "Alt+Win+5")]
+    [InlineData("Ctrl", "Esc", "Ctrl+Escape")]
+    [InlineData("Ctrl", "PgDn", "Ctrl+PageDown")]
+    public void TryParse_accepts_and_normalizes(string modifiers, string key, string expected)
     {
-        var result = HotkeyBinding.Parse(modifiers, key);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(expectedModifiers, (uint)result.Value.Modifiers);
-        Assert.Equal(expectedKey, (uint)result.Value.Key);
-        Assert.Equal(expectedKey, result.Value.VirtualKeyCode);
-        Assert.Equal(expectedText, result.Value.DisplayText);
+        Assert.True(HotkeyBinding.TryParse(modifiers, key, out var binding));
+        Assert.Equal(expected, binding.ToString());
     }
 
     [Theory]
-    [InlineData(null, "R")]
-    [InlineData("Ctrl", null)]
-    [InlineData("", "R")]
-    [InlineData("Ctrl+Hyper", "R")]
-    [InlineData("Ctrl+Ctrl", "R")]
-    [InlineData("Ctrl", "82")]
-    [InlineData("Ctrl", "Shift")]
-    [InlineData("Ctrl", "None")]
-    [InlineData("Ctrl", "DefinitelyNotAKey")]
-    public void ParseRejectsInvalidOrNumericEnumInput(string? modifiers, string? key)
-    {
-        var result = HotkeyBinding.Parse(modifiers, key);
+    [InlineData("", "R")]          // no modifier
+    [InlineData("Ctrl", "")]       // no key
+    [InlineData("Ctrl+Ctrl", "R")] // duplicate
+    [InlineData("Hyper", "R")]     // unknown modifier
+    [InlineData("Ctrl", "F25")]    // unknown key
+    [InlineData("Ctrl", "12")]     // multi-digit
+    [InlineData(null, null)]
+    public void TryParse_rejects_invalid(string? modifiers, string? key) =>
+        Assert.False(HotkeyBinding.TryParse(modifiers, key, out _));
 
-        Assert.True(result.IsFailure);
-        Assert.Equal(ErrorCode.Validation, result.Error!.Code);
+    [Fact]
+    public void Key_names_round_trip_through_virtual_key_codes()
+    {
+        Assert.True(HotkeyBinding.TryParse("Ctrl", "F5", out var binding));
+        Assert.Equal(0x74u, binding.VirtualKey);
+        Assert.Equal("F5", HotkeyBinding.GetKeyName(0x74));
+        Assert.Null(HotkeyBinding.GetKeyName(0x10)); // Shift itself is not a valid key
     }
 
     [Fact]
-    public void CreateRejectsMissingUnknownModifiersAndUnknownKey()
-    {
-        Assert.True(HotkeyBinding.Create(HotkeyModifiers.None, HotkeyKey.R).IsFailure);
-        Assert.True(HotkeyBinding.Create((HotkeyModifiers)0x8000, HotkeyKey.R).IsFailure);
-        Assert.True(HotkeyBinding.Create(HotkeyModifiers.Control, (HotkeyKey)0xFFFF).IsFailure);
-    }
-
-    [Fact]
-    public void DefaultMatchesPersistedDefaults()
-    {
-        Assert.Equal("Ctrl+Shift", HotkeyBinding.Default.ModifierText);
-        Assert.Equal("R", HotkeyBinding.Default.KeyText);
-    }
+    public void Default_is_ctrl_shift_r() =>
+        Assert.Equal("Ctrl+Shift+R", HotkeyBinding.Default.ToString());
 }

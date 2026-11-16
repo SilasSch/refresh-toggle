@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RefreshToggle/RefreshToggle.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RefreshToggle.Tests/RefreshToggle.Tests.csproj" />
+  </Folder>
+</Solution>

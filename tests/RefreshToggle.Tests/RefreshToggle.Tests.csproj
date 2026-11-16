@@ -1,38 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Plain net10.0 so the tests run on any OS: the pure-logic files are compiled in directly
+       instead of referencing the WinForms project. -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-    <RootNamespace>RefreshToggle.Tests</RootNamespace>
-    <AssemblyName>RefreshToggle.Tests</AssemblyName>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
   </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.msbuild">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <Compile Include="..\..\src\RefreshToggle\RateLogic.cs" Link="Linked\RateLogic.cs" />
+    <Compile Include="..\..\src\RefreshToggle\Config.cs" Link="Linked\Config.cs" />
+    <Compile Include="..\..\src\RefreshToggle\HotkeyBinding.cs" Link="Linked\HotkeyBinding.cs" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="../../src/RefreshToggle.App/RefreshToggle.App.csproj" />
-    <ProjectReference Include="../../src/RefreshToggle.Application/RefreshToggle.Application.csproj" />
-    <ProjectReference Include="../../src/RefreshToggle.Core/RefreshToggle.Core.csproj" />
-    <ProjectReference Include="../../src/RefreshToggle.Windows/RefreshToggle.Windows.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" PrivateAssets="all" />
   </ItemGroup>
+
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
+
 </Project>
